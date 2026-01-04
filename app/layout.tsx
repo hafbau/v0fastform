@@ -1,13 +1,14 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Inter, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { StreamingProvider } from '@/contexts/streaming-context'
 import { SWRProvider } from '@/components/providers/swr-provider'
 import { SessionProvider } from '@/components/providers/session-provider'
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const inter = Inter({
+  variable: '--font-inter',
   subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700'],
 })
 
 const geistMono = Geist_Mono({
@@ -18,7 +19,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'fastform',
   description:
-    'A clone of v0.dev built with the v0 SDK - Generate and preview React components with AI',
+    'FastForm — Forms patients actually finish',
 }
 
 export default function RootLayout({
@@ -34,17 +35,17 @@ export default function RootLayout({
             __html: `
               (function() {
                 if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                  document.documentElement.classList.add('dark');
+                  document.documentElement.classList.add('light');
                 } else {
-                  document.documentElement.classList.remove('dark');
+                  document.documentElement.classList.remove('light');
                 }
                 
                 // Listen for changes in system preference
                 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
                   if (e.matches) {
-                    document.documentElement.classList.add('dark');
+                    document.documentElement.classList.add('light');
                   } else {
-                    document.documentElement.classList.remove('dark');
+                    document.documentElement.classList.remove('light');
                   }
                 });
               })();
@@ -53,7 +54,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${inter.variable} ${geistMono.variable} antialiased`}
       >
         <SessionProvider>
           <SWRProvider>

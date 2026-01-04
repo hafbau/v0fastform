@@ -26,6 +26,7 @@ import { ChatInput } from '@/components/chat/chat-input'
 import { PreviewPanel } from '@/components/chat/preview-panel'
 import { ResizableLayout } from '@/components/shared/resizable-layout'
 import { BottomToolbar } from '@/components/shared/bottom-toolbar'
+import { SuggestionsWidget } from '../ai-elements/suggestions-widget'
 
 // Component that uses useSearchParams - needs to be wrapped in Suspense
 function SearchParamsHandler({ onReset }: { onReset: () => void }) {
@@ -546,128 +547,11 @@ export function HomeClient() {
             </PromptInput>
           </div>
 
-          {/* Suggestions */}
-          <div className="mt-4 max-w-2xl mx-auto">
-            <Suggestions>
-              <Suggestion
-                onClick={() => {
-                  setMessage('Landing page')
-                  // Submit after setting message
-                  setTimeout(() => {
-                    const form = textareaRef.current?.form
-                    if (form) {
-                      form.requestSubmit()
-                    }
-                  }, 0)
-                }}
-                suggestion="Landing page"
-              />
-              <Suggestion
-                onClick={() => {
-                  setMessage('Todo app')
-                  // Submit after setting message
-                  setTimeout(() => {
-                    const form = textareaRef.current?.form
-                    if (form) {
-                      form.requestSubmit()
-                    }
-                  }, 0)
-                }}
-                suggestion="Todo app"
-              />
-              <Suggestion
-                onClick={() => {
-                  setMessage('Dashboard')
-                  // Submit after setting message
-                  setTimeout(() => {
-                    const form = textareaRef.current?.form
-                    if (form) {
-                      form.requestSubmit()
-                    }
-                  }, 0)
-                }}
-                suggestion="Dashboard"
-              />
-              <Suggestion
-                onClick={() => {
-                  setMessage('Blog')
-                  // Submit after setting message
-                  setTimeout(() => {
-                    const form = textareaRef.current?.form
-                    if (form) {
-                      form.requestSubmit()
-                    }
-                  }, 0)
-                }}
-                suggestion="Blog"
-              />
-              <Suggestion
-                onClick={() => {
-                  setMessage('E-commerce')
-                  // Submit after setting message
-                  setTimeout(() => {
-                    const form = textareaRef.current?.form
-                    if (form) {
-                      form.requestSubmit()
-                    }
-                  }, 0)
-                }}
-                suggestion="E-commerce"
-              />
-              <Suggestion
-                onClick={() => {
-                  setMessage('Portfolio')
-                  // Submit after setting message
-                  setTimeout(() => {
-                    const form = textareaRef.current?.form
-                    if (form) {
-                      form.requestSubmit()
-                    }
-                  }, 0)
-                }}
-                suggestion="Portfolio"
-              />
-              <Suggestion
-                onClick={() => {
-                  setMessage('Chat app')
-                  // Submit after setting message
-                  setTimeout(() => {
-                    const form = textareaRef.current?.form
-                    if (form) {
-                      form.requestSubmit()
-                    }
-                  }, 0)
-                }}
-                suggestion="Chat app"
-              />
-              <Suggestion
-                onClick={() => {
-                  setMessage('Calculator')
-                  // Submit after setting message
-                  setTimeout(() => {
-                    const form = textareaRef.current?.form
-                    if (form) {
-                      form.requestSubmit()
-                    }
-                  }, 0)
-                }}
-                suggestion="Calculator"
-              />
-            </Suggestions>
-          </div>
-
-          {/* Footer */}
-          <div className="mt-8 md:mt-16 text-center text-sm text-muted-foreground">
-            <p>
-              Powered by{' '}
-              <Link
-                href="https://v0-sdk.dev"
-                className="text-foreground hover:underline"
-              >
-                v0 SDK
-              </Link>
-            </p>
-          </div>
+          <SuggestionsWidget
+            setMessage={setMessage}
+            textareaRef={textareaRef}
+            className="mt-4"
+          />
         </div>
       </div>
     </div>

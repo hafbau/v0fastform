@@ -16,6 +16,7 @@ import {
 } from '@/components/ai-elements/prompt-input'
 import { Suggestions, Suggestion } from '@/components/ai-elements/suggestion'
 import { useState, useCallback, useEffect } from 'react'
+import { SuggestionsWidget } from '../ai-elements/suggestions-widget'
 
 interface ChatInputProps {
   message: string
@@ -161,114 +162,10 @@ export function ChatInput({
         </PromptInput>
       </div>
       {showSuggestions && (
-        <div className="max-w-2xl mx-auto mt-2">
-          <Suggestions>
-            <Suggestion
-              onClick={() => {
-                setMessage('Landing page')
-                // Submit after setting message
-                setTimeout(() => {
-                  const form = textareaRef?.current?.form
-                  if (form) {
-                    form.requestSubmit()
-                  }
-                }, 0)
-              }}
-              suggestion="Landing page"
-            />
-            <Suggestion
-              onClick={() => {
-                setMessage('Todo app')
-                // Submit after setting message
-                setTimeout(() => {
-                  const form = textareaRef?.current?.form
-                  if (form) {
-                    form.requestSubmit()
-                  }
-                }, 0)
-              }}
-              suggestion="Todo app"
-            />
-            <Suggestion
-              onClick={() => {
-                setMessage('Dashboard')
-                // Submit after setting message
-                setTimeout(() => {
-                  const form = textareaRef?.current?.form
-                  if (form) {
-                    form.requestSubmit()
-                  }
-                }, 0)
-              }}
-              suggestion="Dashboard"
-            />
-            <Suggestion
-              onClick={() => {
-                setMessage('Blog')
-                // Submit after setting message
-                setTimeout(() => {
-                  const form = textareaRef?.current?.form
-                  if (form) {
-                    form.requestSubmit()
-                  }
-                }, 0)
-              }}
-              suggestion="Blog"
-            />
-            <Suggestion
-              onClick={() => {
-                setMessage('E-commerce')
-                // Submit after setting message
-                setTimeout(() => {
-                  const form = textareaRef?.current?.form
-                  if (form) {
-                    form.requestSubmit()
-                  }
-                }, 0)
-              }}
-              suggestion="E-commerce"
-            />
-            <Suggestion
-              onClick={() => {
-                setMessage('Portfolio')
-                // Submit after setting message
-                setTimeout(() => {
-                  const form = textareaRef?.current?.form
-                  if (form) {
-                    form.requestSubmit()
-                  }
-                }, 0)
-              }}
-              suggestion="Portfolio"
-            />
-            <Suggestion
-              onClick={() => {
-                setMessage('Chat app')
-                // Submit after setting message
-                setTimeout(() => {
-                  const form = textareaRef?.current?.form
-                  if (form) {
-                    form.requestSubmit()
-                  }
-                }, 0)
-              }}
-              suggestion="Chat app"
-            />
-            <Suggestion
-              onClick={() => {
-                setMessage('Calculator')
-                // Submit after setting message
-                setTimeout(() => {
-                  const form = textareaRef?.current?.form
-                  if (form) {
-                    form.requestSubmit()
-                  }
-                }, 0)
-              }}
-              suggestion="Calculator"
-            />
-          </Suggestions>
-        </div>
+        <SuggestionsWidget
+          setMessage={setMessage}
+          textareaRef={textareaRef}
+        />
       )}
     </div>
   )

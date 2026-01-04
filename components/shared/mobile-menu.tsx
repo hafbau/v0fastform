@@ -129,70 +129,21 @@ export function MobileMenu({ onInfoDialogOpen }: MobileMenuProps) {
 
                 {/* Menu items */}
                 <div className="space-y-2">
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start h-auto p-3 text-left"
-                    onClick={() => {
-                      onInfoDialogOpen()
-                      closeMenu()
-                    }}
+                  <Link
+                    href="/"
+                    onClick={handleLogoClick}
+                    className="block text-lg font-semibold text-gray-900 dark:text-white hover:text-gray-700 dark:hover:text-gray-300"
                   >
-                    <div className="flex items-center gap-3 w-full">
-                      <Info className="h-4 w-4 flex-shrink-0" />
-                      <div className="flex-1">
-                        <div className="font-medium">What's This?</div>
-                        <div className="text-sm text-muted-foreground">
-                          Learn about fastform
-                        </div>
+                    <div className="mb-8 flex items-baseline gap-0.5">
+                      <div className="text-2xl font-extrabold tracking-tight">
+                        fastform
                       </div>
+                      <div
+                        className="h-2 w-2 rounded-full bg-primary"
+                        aria-hidden="true"
+                      />
                     </div>
-                  </Button>
-
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start h-auto p-3 text-left"
-                    asChild
-                  >
-                    <Link
-                      href="https://github.com/vercel/v0-sdk"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={closeMenu}
-                    >
-                      <div className="flex items-center gap-3 w-full">
-                        <GitHubIcon size={16} />
-                        <div className="flex-1">
-                          <div className="font-medium">GitHub</div>
-                          <div className="text-sm text-muted-foreground">
-                            vercel/v0-sdk
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                  </Button>
-
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start h-auto p-3 text-left"
-                    asChild
-                  >
-                    <Link
-                      href={DEPLOY_URL}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={closeMenu}
-                    >
-                      <div className="flex items-center gap-3 w-full">
-                        <VercelIcon size={16} />
-                        <div className="flex-1">
-                          <div className="font-medium">Deploy with Vercel</div>
-                          <div className="text-sm text-muted-foreground">
-                            Get your own fastform
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                  </Button>
+                  </Link>
                 </div>
               </div>
             </div>

@@ -22,7 +22,7 @@ export function checkRequiredEnvVars(): MissingEnvVar[] {
     {
       name: 'POSTGRES_URL',
       description: 'PostgreSQL database connection string',
-      example: '', // No example - user needs to provide their own
+      example: 'postgres://postgres:postgrespassword@localhost:5435/fastform',
       required: true,
     },
   ]
