@@ -1,13 +1,13 @@
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: v0fastform-postgres
+    container_name: fastform-postgres
     ports:
       - "5435:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgrespassword
-      POSTGRES_DB: v0fastform
+      POSTGRES_DB: fastform
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped

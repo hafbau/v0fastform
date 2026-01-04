@@ -80,7 +80,7 @@ export function AppHeader({ className = '' }: AppHeaderProps) {
               onClick={handleLogoClick}
               className="text-lg font-semibold text-gray-900 dark:text-white hover:text-gray-700 dark:hover:text-gray-300"
             >
-              v0fastform
+              fastform
             </Link>
             {/* Hide ChatSelector on mobile */}
             <div className="hidden lg:block">
@@ -139,7 +139,7 @@ export function AppHeader({ className = '' }: AppHeaderProps) {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold mb-4">
-              v0fastform Platform
+              fastform Platform
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 text-sm text-gray-600 dark:text-gray-300">
@@ -151,7 +151,7 @@ export function AppHeader({ className = '' }: AppHeaderProps) {
                 rel="noopener noreferrer"
                 className="underline text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
               >
-                v0fastform
+                fastform
               </a>{' '}
               where users can enter text prompts and generate React components
               and applications using AI.

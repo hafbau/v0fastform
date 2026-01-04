@@ -530,7 +530,7 @@ export const sharedComponents = {
   CodeBlock,
   MathPart,
 
-  // Styled HTML elements for the v0fastform theme
+  // Styled HTML elements for the fastform theme
   p: {
     className: 'mb-4 text-gray-700 dark:text-gray-200 leading-relaxed',
   },

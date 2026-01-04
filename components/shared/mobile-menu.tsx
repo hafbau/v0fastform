@@ -142,7 +142,7 @@ export function MobileMenu({ onInfoDialogOpen }: MobileMenuProps) {
                       <div className="flex-1">
                         <div className="font-medium">What's This?</div>
                         <div className="text-sm text-muted-foreground">
-                          Learn about v0fastform
+                          Learn about fastform
                         </div>
                       </div>
                     </div>
@@ -187,7 +187,7 @@ export function MobileMenu({ onInfoDialogOpen }: MobileMenuProps) {
                         <div className="flex-1">
                           <div className="font-medium">Deploy with Vercel</div>
                           <div className="text-sm text-muted-foreground">
-                            Get your own v0fastform
+                            Get your own fastform
                           </div>
                         </div>
                       </div>

@@ -1,4 +1,4 @@
-# v0fastform
+# fastform
 
 /clavix:improve Fastform is a mini-app builder, that is HIPAA Compliant, leverages AI for Telehealth practices. Here are some of the features
 

@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'v0fastform',
+  title: 'fastform',
   description:
     'A clone of v0.dev built with the v0 SDK - Generate and preview React components with AI',
 }
