@@ -1,7 +1,7 @@
 # Copilot Instructions for v0-clone
 
 ## Project Overview
-This is a Next.js 15 (App Router) application that clones v0.dev functionality. It uses a hybrid architecture where user authentication and chat ownership are managed locally via PostgreSQL (Drizzle ORM), while actual chat content and generation are delegated to the `v0-sdk` / V0 API.
+This is a Next.js 15 (App Router) application that clones fastform functionality. It uses a hybrid architecture where user authentication and chat ownership are managed locally via PostgreSQL (Drizzle ORM), while actual chat content and generation are delegated to the `v0-sdk` / V0 API.
 
 ## Tech Stack
 - **Framework**: Next.js 15.5+ (App Router) with Turbopack

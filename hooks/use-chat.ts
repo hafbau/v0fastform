@@ -49,6 +49,19 @@ export function useChat(chatId: string) {
         chatHistory.length === 0 &&
         !(handoff.chatId === chatId && handoff.stream)
       ) {
+        // Debug: Log messages being loaded
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[useChat] Loading messages from API:', chat.messages.length, 'messages')
+          chat.messages.forEach((msg, index) => {
+            console.log(`[useChat] Message ${index}:`, {
+              role: msg.role,
+              hasExperimentalContent: !!msg.experimental_content,
+              experimentalContentLength: Array.isArray(msg.experimental_content) ? msg.experimental_content.length : 'N/A',
+              contentPreview: typeof msg.content === 'string' ? msg.content.substring(0, 100) : 'not a string',
+              experimentalContent: msg.experimental_content,
+            })
+          })
+        }
         setChatHistory(
           chat.messages.map((msg) => ({
             type: msg.role,

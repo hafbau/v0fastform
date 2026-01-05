@@ -14,7 +14,7 @@
 - Published to production (uses Fastform subdomain (app-slug-org-slug.getfastform.com) or Custom domain)
 - System Monitoring
 
-My thinking is to use AI first authoring, with ability for manual overrides. The UI I'm going for looks very close to v0.dev. This current repo is a simplified version of the real v0.dev
+My thinking is to use AI first authoring, with ability for manual overrides. The UI I'm going for looks very close to fastform. This current repo is a simplified version of the real fastform
 
 Help me, where do I go from here?
 ---

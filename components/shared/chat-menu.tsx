@@ -108,7 +108,7 @@ export function ChatMenu({ chatId }: ChatMenuProps) {
               className="flex items-center"
             >
               <ExternalLink className="mr-2 h-4 w-4" />
-              View on v0.dev
+              View on fastform
             </a>
           </DropdownMenuItem>
           <DropdownMenuSeparator />

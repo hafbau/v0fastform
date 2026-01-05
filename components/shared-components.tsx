@@ -165,6 +165,34 @@ export const TaskSectionWrapper = ({
                 )
               }
 
+              // Handle integration request parts (user-input-required)
+              if (partObj.type === 'request-install-integration') {
+                const steps = partObj.steps || []
+                return (
+                  <TaskItem key={index}>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-medium">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <span>Action Required</span>
+                      </div>
+                      {steps.map((step: any, i: number) => (
+                        <div key={i} className="flex items-center gap-2 text-gray-700 dark:text-gray-300 text-sm bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md px-3 py-2">
+                          <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                          </svg>
+                          <span>Add integration: <strong>{step.stepName || step.type}</strong></span>
+                        </div>
+                      ))}
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Please add this integration on fastform to continue
+                      </p>
+                    </div>
+                  </TaskItem>
+                )
+              }
+
               // Handle design inspiration task parts
               if (partObj.type === 'generating-design-inspiration') {
                 return (
@@ -172,6 +200,33 @@ export const TaskSectionWrapper = ({
                     Generating design inspiration...
                   </TaskItem>
                 )
+              }
+
+              // Handle starting-design-inspiration
+              if (partObj.type === 'starting-design-inspiration') {
+                return (
+                  <TaskItem key={index}>
+                    <div className="text-gray-600 dark:text-gray-400 text-sm">
+                      Generating design inspiration for: "{partObj.prompt?.substring(0, 100)}{partObj.prompt?.length > 100 ? '...' : ''}"
+                    </div>
+                  </TaskItem>
+                )
+              }
+
+              // Handle finished-design-inspiration
+              if (partObj.type === 'finished-design-inspiration') {
+                return (
+                  <TaskItem key={index}>
+                    <div className="text-green-600 dark:text-green-400 text-sm">
+                      ✓ Design inspiration generated
+                    </div>
+                  </TaskItem>
+                )
+              }
+
+              // Handle tool-calls (waiting state)
+              if (partObj.type === 'tool-calls') {
+                return null // Don't render anything for tool-calls waiting state
               }
 
               if (
@@ -421,6 +476,29 @@ export const CodeProjectPartWrapper = ({
 // Shared components object that can be used by both StreamingMessage and MessageRenderer
 // Custom TaskSection that handles code projects properly
 const CustomTaskSectionWrapper = (props: any) => {
+  // Check if this task requires user input (integration requests, etc.)
+  const requiresUserInput = props.stopped?.reason === 'user-input-required'
+
+  // Handle task-get-or-request-integration-v1 type specifically
+  if (props.type === 'task-get-or-request-integration-v1') {
+    const integration = props.integration || 'Integration'
+    const title = requiresUserInput
+      ? `⚠️ ${integration} Setup Required`
+      : props.taskNameComplete || props.taskNameActive || `Setting up ${integration}`
+
+    return (
+      <TaskSectionWrapper
+        {...props}
+        title={title}
+      />
+    )
+  }
+
+  // Handle task-waiting-v1 - don't render these as they're just internal state
+  if (props.type === 'task-waiting-v1') {
+    return null
+  }
+
   // If this task contains code project parts, render as CodeProjectPart instead
   if (
     props.parts &&

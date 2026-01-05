@@ -2,13 +2,21 @@ import React from 'react'
 import { Message, MessageBinaryFormat } from '@v0-sdk/react'
 import { sharedComponents } from './shared-components'
 
+// Debug flag - set to true to see message content structure in console
+const DEBUG_MESSAGES = process.env.NODE_ENV === 'development'
+
 // Function to preprocess message content and remove V0_FILE markers and shell placeholders
 function preprocessMessageContent(
   content: MessageBinaryFormat,
 ): MessageBinaryFormat {
   if (!Array.isArray(content)) return content
 
-  return content.map((row) => {
+  // Debug: Log the raw content structure
+  if (DEBUG_MESSAGES) {
+    console.log('[MessageRenderer] Raw content structure:', JSON.stringify(content, null, 2))
+  }
+
+  const processed = content.map((row) => {
     if (!Array.isArray(row)) return row
 
     // Process text content to remove V0_FILE markers and shell placeholders
@@ -38,6 +46,24 @@ function preprocessMessageContent(
       return item
     }) as [number, ...any[]] // Type assertion to match MessageBinaryFormat structure
   })
+
+  // Filter out rows that are completely empty (all string content is empty)
+  const filtered = processed.filter((row) => {
+    if (!Array.isArray(row)) return true
+    // Keep rows that have at least one non-empty string or non-string content
+    const hasContent = row.slice(1).some((item) => {
+      if (typeof item === 'string') return item.length > 0
+      if (typeof item === 'object' && item !== null) return true
+      return false
+    })
+    return hasContent
+  })
+
+  if (DEBUG_MESSAGES) {
+    console.log('[MessageRenderer] Processed content:', JSON.stringify(filtered, null, 2))
+  }
+
+  return filtered as MessageBinaryFormat
 }
 
 interface MessageRendererProps {
@@ -67,6 +93,23 @@ export function MessageRenderer({
   // If content is MessageBinaryFormat (from v0 API), use the Message component
   // Preprocess content to remove V0_FILE markers and shell placeholders
   const processedContent = preprocessMessageContent(content)
+
+  // If processed content is empty, show a fallback
+  if (!processedContent || processedContent.length === 0) {
+    if (DEBUG_MESSAGES) {
+      console.log('[MessageRenderer] Content empty after processing, showing raw:', content)
+    }
+    // Try to render raw content without processing
+    return (
+      <Message
+        content={content}
+        messageId={messageId}
+        role={role}
+        className={className}
+        components={sharedComponents}
+      />
+    )
+  }
 
   return (
     <Message

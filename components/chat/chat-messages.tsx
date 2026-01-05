@@ -74,6 +74,10 @@ export function ChatMessages({
                   onComplete={onStreamingComplete}
                   onChatData={onChatData}
                   onChunk={(chunk) => {
+                    // Debug: Log chunk content to understand structure
+                    if (process.env.NODE_ENV === 'development') {
+                      console.log('[StreamingMessage] Received chunk:', JSON.stringify(chunk, null, 2))
+                    }
                     // Hide external loader once we start receiving content (only once)
                     if (onStreamingStarted && !streamingStartedRef.current) {
                       streamingStartedRef.current = true
@@ -84,12 +88,16 @@ export function ChatMessages({
                   components={sharedComponents}
                   showLoadingIndicator={false}
                 />
-              ) : (
+              ) : msg.content && (Array.isArray(msg.content) ? msg.content.length > 0 : msg.content.length > 0) ? (
                 <MessageRenderer
                   content={msg.content}
                   role={msg.type}
                   messageId={`msg-${index}`}
                 />
+              ) : (
+                <div className="text-gray-500 dark:text-gray-400 italic text-sm">
+                  (Message content unavailable)
+                </div>
               )}
             </Message>
           ))}
