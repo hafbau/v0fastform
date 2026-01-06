@@ -95,8 +95,8 @@
     "clsx": "^2.1.1",
     "cmdk": "latest",
     "dotenv": "17.2.3",
-    "drizzle-kit": "0.30.4",
-    "drizzle-orm": "0.39.3",
+    "drizzle-kit": "^0.31.8",
+    "drizzle-orm": "^0.44.5",
     "embla-carousel-react": "^8.6.0",
     "expo": "latest",
     "expo-sqlite": "latest",
@@ -117,6 +117,7 @@
     "node-gyp": "latest",
     "nodemailer": "latest",
     "pg": "latest",
+    "pg-native": "latest",
     "playwright": "latest",
     "postgres": "^3.4.7",
     "prisma": "latest",
@@ -183,11 +184,7 @@
   "engines": {
     "node": ">=22.0.0"
   },
-  "pnpm": {
-    "peerDependencyRules": {
-      "ignoreMissing": [
-        "pg-native"
-      ]
-    }
-  }
+  "trustedDependencies": [
+    "pg-native"
+  ]
 }
