@@ -66,11 +66,13 @@ describe('Database Schema', () => {
       const columnKeys = Object.keys(chatOwnerships)
       expect(columnKeys).toContain('v0ChatId')
       expect(columnKeys).toContain('userId')
+      expect(columnKeys).toContain('appId')
       expect(columnKeys).toContain('createdAt')
 
       // Should NOT have snake_case columns
       expect(columnKeys).not.toContain('v0_chat_id')
       expect(columnKeys).not.toContain('user_id')
+      expect(columnKeys).not.toContain('app_id')
       expect(columnKeys).not.toContain('created_at')
     })
 
@@ -79,10 +81,12 @@ describe('Database Schema', () => {
         id: '123',
         v0ChatId: 'chat-456',
         userId: 'user-789',
+        appId: 'app-101',
         createdAt: new Date(),
       }
       expect(mockOwnership.v0ChatId).toBe('chat-456')
       expect(mockOwnership.userId).toBe('user-789')
+      expect(mockOwnership.appId).toBe('app-101')
     })
   })
 
