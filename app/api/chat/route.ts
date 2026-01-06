@@ -6,6 +6,7 @@ import {
   createAnonymousChatLog,
   getChatCountByUserId,
   getChatCountByIP,
+  getAppById,
 } from '@/lib/db/queries'
 import {
   entitlementsByUserType,
@@ -37,14 +38,31 @@ function getClientIP(request: NextRequest): string {
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
-    const { message, chatId, streaming, attachments, projectId } =
+    const { message, chatId, streaming, attachments, appId } =
       await request.json()
-    
+
     if (!message) {
       return NextResponse.json(
         { error: 'Message is required' },
         { status: 400 },
       )
+    }
+
+    // Validate appId for new authenticated chats
+    if (!chatId && session?.user?.id && appId) {
+      const app = await getAppById({ appId })
+      if (!app) {
+        return NextResponse.json(
+          { error: 'App not found' },
+          { status: 404 },
+        )
+      }
+      if (app.userId !== session.user.id) {
+        return NextResponse.json(
+          { error: 'Forbidden - you do not own this app' },
+          { status: 403 },
+        )
+      }
     }
 
     // Rate limiting
@@ -208,8 +226,9 @@ export async function POST(request: NextRequest) {
           await createChatOwnership({
             v0ChatId: chatDetail.id,
             userId: session.user.id,
+            appId, // optional during migration, required after
           })
-          console.log('Chat ownership created:', chatDetail.id)
+          console.log('Chat ownership created:', chatDetail.id, 'appId:', appId)
         } else {
           // Anonymous user - log for rate limiting
           const clientIP = getClientIP(request)

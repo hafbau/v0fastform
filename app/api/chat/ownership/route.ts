@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/app/(auth)/auth'
-import { createChatOwnership, createAnonymousChatLog } from '@/lib/db/queries'
+import { createChatOwnership, createAnonymousChatLog, getAppById } from '@/lib/db/queries'
 
 function getClientIP(request: NextRequest): string {
   const forwarded = request.headers.get('x-forwarded-for')
@@ -21,7 +21,7 @@ function getClientIP(request: NextRequest): string {
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
-    const { chatId } = await request.json()
+    const { chatId, appId } = await request.json()
 
     if (!chatId) {
       return NextResponse.json(
@@ -30,13 +30,31 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Validate appId for authenticated users
+    if (session?.user?.id && appId) {
+      const app = await getAppById({ appId })
+      if (!app) {
+        return NextResponse.json(
+          { error: 'App not found' },
+          { status: 404 },
+        )
+      }
+      if (app.userId !== session.user.id) {
+        return NextResponse.json(
+          { error: 'Forbidden - you do not own this app' },
+          { status: 403 },
+        )
+      }
+    }
+
     if (session?.user?.id) {
       // Authenticated user - create ownership mapping
       await createChatOwnership({
         v0ChatId: chatId,
         userId: session.user.id,
+        appId, // optional during migration, required after
       })
-      console.log('Chat ownership created via API:', chatId)
+      console.log('Chat ownership created via API:', chatId, 'appId:', appId)
     } else {
       // Anonymous user - log for rate limiting
       const clientIP = getClientIP(request)
