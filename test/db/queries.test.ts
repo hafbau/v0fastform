@@ -47,6 +47,11 @@ describe('Database Queries - camelCase verification', () => {
       expect(queries.getChatCountByUserId).toBeDefined()
       expect(queries.getChatCountByIP).toBeDefined()
       expect(queries.createAnonymousChatLog).toBeDefined()
+      // App CRUD functions
+      expect(queries.createApp).toBeDefined()
+      expect(queries.getAppsByUserId).toBeDefined()
+      expect(queries.getAppById).toBeDefined()
+      expect(queries.deleteApp).toBeDefined()
     })
   })
 
@@ -88,6 +93,75 @@ describe('Database Queries - camelCase verification', () => {
         ipAddress: '192.168.1.1',
         v0ChatId: 'chat-789',
       })
+    })
+  })
+
+  describe('createApp', () => {
+    it('should use camelCase column names in values', async () => {
+      const { createApp } = await import('../../lib/db/queries')
+
+      mockDb.returning.mockResolvedValueOnce([{ id: 'app-1', userId: 'user-123', name: 'My App' }])
+
+      await createApp({
+        userId: 'user-123',
+        name: 'My App',
+      })
+
+      // Verify insert was called
+      expect(mockDb.insert).toHaveBeenCalled()
+
+      // Verify values uses camelCase keys
+      expect(mockDb.values).toHaveBeenCalledWith({
+        userId: 'user-123',
+        name: 'My App',
+      })
+    })
+  })
+
+  describe('getAppsByUserId', () => {
+    it('should query apps by userId', async () => {
+      const { getAppsByUserId } = await import('../../lib/db/queries')
+
+      mockDb.orderBy.mockResolvedValueOnce([
+        { id: 'app-1', userId: 'user-123', name: 'App 1' },
+        { id: 'app-2', userId: 'user-123', name: 'App 2' },
+      ])
+
+      const result = await getAppsByUserId({ userId: 'user-123' })
+
+      expect(mockDb.select).toHaveBeenCalled()
+      expect(mockDb.from).toHaveBeenCalled()
+      expect(mockDb.where).toHaveBeenCalled()
+      expect(mockDb.orderBy).toHaveBeenCalled()
+      expect(result).toHaveLength(2)
+    })
+  })
+
+  describe('getAppById', () => {
+    it('should return app by id', async () => {
+      const { getAppById } = await import('../../lib/db/queries')
+
+      mockDb.where.mockResolvedValueOnce([{ id: 'app-1', userId: 'user-123', name: 'My App' }])
+
+      const result = await getAppById({ appId: 'app-1' })
+
+      expect(mockDb.select).toHaveBeenCalled()
+      expect(mockDb.from).toHaveBeenCalled()
+      expect(mockDb.where).toHaveBeenCalled()
+      expect(result?.name).toBe('My App')
+    })
+  })
+
+  describe('deleteApp', () => {
+    it('should delete app by id', async () => {
+      const { deleteApp } = await import('../../lib/db/queries')
+
+      mockDb.where.mockResolvedValueOnce({ rowCount: 1 })
+
+      await deleteApp({ appId: 'app-1' })
+
+      expect(mockDb.delete).toHaveBeenCalled()
+      expect(mockDb.where).toHaveBeenCalled()
     })
   })
 })

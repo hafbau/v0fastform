@@ -2,7 +2,7 @@ import "server-only"
 
 import { and, count, desc, eq, gte } from "drizzle-orm"
 
-import { users, chatOwnerships, anonymousChatLogs, type User } from "./schema"
+import { users, apps, chatOwnerships, anonymousChatLogs, type User, type App } from "./schema"
 import { generateUUID } from "../utils"
 import { generateHashedPassword } from "./utils"
 import { getDb } from "./connection"
@@ -49,6 +49,72 @@ export async function createGuestUser(): Promise<User[]> {
       .returning()
   } catch (error) {
     console.error("Failed to create guest user in database:", error)
+    throw error
+  }
+}
+
+// App functions
+export async function createApp({
+  userId,
+  name,
+}: {
+  userId: string
+  name: string
+}): Promise<App[]> {
+  try {
+    const db = getDb()
+    return await db
+      .insert(apps)
+      .values({
+        userId,
+        name,
+      })
+      .returning()
+  } catch (error) {
+    console.error("Failed to create app in database:", error)
+    throw error
+  }
+}
+
+export async function getAppsByUserId({
+  userId,
+}: {
+  userId: string
+}): Promise<App[]> {
+  try {
+    const db = getDb()
+    return await db
+      .select()
+      .from(apps)
+      .where(eq(apps.userId, userId))
+      .orderBy(desc(apps.createdAt))
+  } catch (error) {
+    console.error("Failed to get apps by user from database:", error)
+    throw error
+  }
+}
+
+export async function getAppById({
+  appId,
+}: {
+  appId: string
+}): Promise<App | undefined> {
+  try {
+    const db = getDb()
+    const [app] = await db.select().from(apps).where(eq(apps.id, appId))
+    return app
+  } catch (error) {
+    console.error("Failed to get app by id from database:", error)
+    throw error
+  }
+}
+
+export async function deleteApp({ appId }: { appId: string }) {
+  try {
+    const db = getDb()
+    return await db.delete(apps).where(eq(apps.id, appId))
+  } catch (error) {
+    console.error("Failed to delete app from database:", error)
     throw error
   }
 }
