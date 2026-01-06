@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { LogoFull } from '../logo'
 
 interface AppHeaderProps {
   className?: string
@@ -80,10 +81,7 @@ export function AppHeader({ className = '' }: AppHeaderProps) {
               onClick={handleLogoClick}
               className="text-lg font-semibold text-gray-900 dark:text-white hover:text-gray-700 dark:hover:text-gray-300"
             >
-              <div className="flex items-baseline gap-0.5">
-                <div className="text-2xl font-extrabold tracking-tight">fastform</div>
-                <div className="h-2 w-2 rounded-full bg-primary" aria-hidden="true" />
-              </div>
+              <LogoFull />
             </Link>
             {/* Hide ChatSelector on mobile */}
             <div className="hidden lg:block">
