@@ -1,23 +1,15 @@
-'use client'
+"use client"
 
-import { useState, useEffect, Suspense } from 'react'
-import Link from 'next/link'
-import { usePathname, useSearchParams } from 'next/navigation'
-import { ChatSelector } from './chat-selector'
-import { MobileMenu } from './mobile-menu'
-import { useSession } from 'next-auth/react'
-import { UserNav } from '@/components/user-nav'
-import { Button } from '@/components/ui/button'
-import { VercelIcon, GitHubIcon } from '@/components/ui/icons'
-import { DEPLOY_URL } from '@/lib/constants'
-import { Info } from 'lucide-react'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import type React from "react"
+
+import { useState, useEffect, Suspense } from "react"
+import Link from "next/link"
+import { usePathname, useSearchParams } from "next/navigation"
+import { ChatSelector } from "./chat-selector"
+import { MobileMenu } from "./mobile-menu"
+import { useSession } from "next-auth/react"
+import { UserNav } from "@/components/user-nav"
+import { Logo } from "@/components/logo"
 
 interface AppHeaderProps {
   className?: string
@@ -30,7 +22,7 @@ function SearchParamsHandler() {
 
   // Force session refresh when redirected after auth
   useEffect(() => {
-    const shouldRefresh = searchParams.get('refresh') === 'session'
+    const shouldRefresh = searchParams.get("refresh") === "session"
 
     if (shouldRefresh) {
       // Force session update
@@ -38,18 +30,18 @@ function SearchParamsHandler() {
 
       // Clean up URL without causing navigation
       const url = new URL(window.location.href)
-      url.searchParams.delete('refresh')
-      window.history.replaceState({}, '', url.pathname)
+      url.searchParams.delete("refresh")
+      window.history.replaceState({}, "", url.pathname)
     }
   }, [searchParams, update])
 
   return null
 }
 
-export function AppHeader({ className = '' }: AppHeaderProps) {
+export function AppHeader({ className = "" }: AppHeaderProps) {
   const pathname = usePathname()
   const { data: session } = useSession()
-  const isHomepage = pathname === '/'
+  const isHomepage = pathname === "/"
   const [isInfoDialogOpen, setIsInfoDialogOpen] = useState(false)
 
   // Handle logo click - reset UI if on homepage, otherwise navigate to homepage
@@ -57,15 +49,13 @@ export function AppHeader({ className = '' }: AppHeaderProps) {
     if (isHomepage) {
       e.preventDefault()
       // Add reset parameter to trigger UI reset
-      window.location.href = '/?reset=true'
+      window.location.href = "/?reset=true"
     }
     // If not on homepage, let the Link component handle navigation normally
   }
 
   return (
-    <div
-      className={`${!isHomepage ? 'border-b border-border dark:border-input' : ''} ${className}`}
-    >
+    <div className={`${!isHomepage ? "border-b border-border dark:border-input" : ""} ${className}`}>
       {/* Handle search params with Suspense boundary */}
       <Suspense fallback={null}>
         <SearchParamsHandler />
@@ -78,12 +68,9 @@ export function AppHeader({ className = '' }: AppHeaderProps) {
             <Link
               href="/"
               onClick={handleLogoClick}
-              className="text-lg font-semibold text-gray-900 dark:text-white hover:text-gray-700 dark:hover:text-gray-300"
+              className="text-foreground hover:text-foreground/80 transition-colors"
             >
-              <div className="flex items-baseline gap-0.5">
-                <div className="text-2xl font-extrabold tracking-tight">fastform</div>
-                <div className="h-2 w-2 rounded-full bg-primary" aria-hidden="true" />
-              </div>
+              <Logo />
             </Link>
             {/* Hide ChatSelector on mobile */}
             <div className="hidden lg:block">
