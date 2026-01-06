@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
 import {
   PromptInput,
   PromptInputImageButton,
@@ -19,7 +18,6 @@ import {
   clearPromptFromStorage,
   type ImageAttachment,
 } from '@/components/ai-elements/prompt-input'
-import { Suggestions, Suggestion } from '@/components/ai-elements/suggestion'
 import { AppLayout } from '@/components/layouts'
 import { ChatMessages } from '@/components/chat/chat-messages'
 import { ChatInput } from '@/components/chat/chat-input'
@@ -70,7 +68,6 @@ export function HomeClient() {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [activePanel, setActivePanel] = useState<'chat' | 'preview'>('chat')
-  const router = useRouter()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const handleReset = () => {
@@ -420,13 +417,13 @@ export function HomeClient() {
 
   if (showChatInterface) {
     return (
-      <AppLayout requireAuth={false} className="flex flex-col">
+      <div>
         {/* Handle search params with Suspense boundary */}
         <Suspense fallback={null}>
           <SearchParamsHandler onReset={handleReset} />
         </Suspense>
 
-        <div className="flex flex-col h-[calc(100vh-64px-40px)] md:h-[calc(100vh-64px)]">
+        <div className="flex flex-col h-[calc(100vh-56px-40px)] md:h-[calc(100vh-56px)]">
           <ResizableLayout
             className="flex-1 min-h-0"
             singlePanelMode={false}
@@ -472,12 +469,12 @@ export function HomeClient() {
             />
           </div>
         </div>
-      </AppLayout>
+      </div>
     )
   }
 
   return (
-    <AppLayout requireAuth={false} className="flex flex-col">
+    <div>
       {/* Handle search params with Suspense boundary */}
       <Suspense fallback={null}>
         <SearchParamsHandler onReset={handleReset} />
@@ -512,7 +509,7 @@ export function HomeClient() {
                 onChange={(e) => setMessage(e.target.value)}
                 value={message}
                 placeholder="Describe what you want to build..."
-                className="min-h-[80px] text-base"
+                className="min-h-20 text-base"
                 disabled={isLoading}
               />
               <PromptInputToolbar>
@@ -550,6 +547,6 @@ export function HomeClient() {
           />
         </div>
       </div>
-    </AppLayout>
+    </div>
   )
 }

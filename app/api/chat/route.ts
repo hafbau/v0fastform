@@ -37,11 +37,9 @@ function getClientIP(request: NextRequest): string {
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
-    const { message, chatId, streaming: _ignored, attachments, projectId } =
+    const { message, chatId, streaming, attachments, projectId } =
       await request.json()
     
-    const streaming = false; // Disable streaming for repo-based chats
-
     if (!message) {
       return NextResponse.json(
         { error: 'Message is required' },
@@ -166,32 +164,32 @@ export async function POST(request: NextRequest) {
           },
         })
       } else {
-        // // Use sync mode
-        // console.log('Creating sync chat with params:', {
-        //   message,
-        //   responseMode: 'sync',
-        // })
-        // chat = await v0.chats.create({
-        //   message,
-        //   responseMode: 'sync',
-        //   ...(attachments && attachments.length > 0 && { attachments }),
-        // })
-        // console.log('Sync chat created successfully')
-        console.log('Initializing repo-based chat with params:', {
+        // Use sync mode
+        console.log('Creating sync chat with params:', {
           message,
-          projectId,
+          responseMode: 'sync',
         })
-        chat = await v0.chats.init({
-          type: 'repo',
-          repo: {
-            url: 'https://github.com/hafbau/v2fastform', // Replace with your GitHub repository URL
-            branch: 'main', // Optional: specify the branch, defaults to the default branch
-          },
-          // Optional: you can also specify a projectId if you want to link it to an existing project
-          // projectId: 'your-project-id',
-          name: 'v2fastform', // Optional: name for the new v0 project/chat
-        });
-        console.log('Repo-based chat initialized successfully', { chat })
+        chat = await v0.chats.create({
+          message,
+          responseMode: 'sync',
+          ...(attachments && attachments.length > 0 && { attachments }),
+        })
+        console.log('Sync chat created successfully')
+        // console.log('Initializing repo-based chat with params:', {
+        //   message,
+        //   projectId,
+        // })
+        // chat = await v0.chats.init({
+        //   type: 'repo',
+        //   repo: {
+        //     url: 'https://github.com/hafbau/v2fastform', // Replace with your GitHub repository URL
+        //     branch: 'main', // Optional: specify the branch, defaults to the default branch
+        //   },
+        //   // Optional: you can also specify a projectId if you want to link it to an existing project
+        //   // projectId: 'your-project-id',
+        //   name: 'v2fastform', // Optional: name for the new v0 project/chat
+        // });
+        // console.log('Repo-based chat initialized successfully', { chat })
       }
     }
 

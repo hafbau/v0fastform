@@ -38,7 +38,7 @@ export async function proxy(request: NextRequest) {
     }
 
     // Allow homepage for anonymous users
-    if (pathname === '/') {
+    if (pathname === '/' || pathname === '/apps') {
       return NextResponse.next()
     }
 
@@ -59,7 +59,7 @@ export async function proxy(request: NextRequest) {
   const isGuest = guestRegex.test(token?.email ?? '')
 
   if (token && !isGuest && ['/login', '/register'].includes(pathname)) {
-    return NextResponse.redirect(new URL('/', request.url))
+    return NextResponse.redirect(new URL('/apps', request.url))
   }
 
   return NextResponse.next()
@@ -68,6 +68,7 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     '/',
+    '/apps',
     '/chats/:path*',
     '/projects/:path*',
     '/api/:path*',

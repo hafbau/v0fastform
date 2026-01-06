@@ -2,7 +2,6 @@
 
 import { ReactNode } from 'react'
 import { useSession } from 'next-auth/react'
-import { redirect } from 'next/navigation'
 import { AppNavbar, type AppNavbarProps } from './app-navbar'
 import { cn } from '@/lib/utils'
 
@@ -13,12 +12,10 @@ interface AppLayoutProps {
   navItems?: AppNavbarProps['navItems']
   /** Additional CSS classes for the main content area */
   className?: string
-  /** Whether to enforce authentication (redirects to login if not authenticated) */
-  requireAuth?: boolean
 }
 
 /**
- * Comprehensive layout component for logged-in user interfaces.
+ * Layout component for app pages with navigation.
  *
  * Features:
  * - Fixed top navigation bar with FastForm branding
@@ -26,11 +23,11 @@ interface AppLayoutProps {
  * - User avatar with dropdown menu containing Log Out
  * - Responsive design for mobile and desktop
  * - Automatic padding to account for fixed navbar
- * - Optional authentication enforcement
+ *
+ * Note: Authentication is handled by middleware (proxy.ts), not this component.
  *
  * @example
  * ```tsx
- * // Basic usage in a page
  * export default function AppsPage() {
  *   return (
  *     <AppLayout>
@@ -40,46 +37,16 @@ interface AppLayoutProps {
  *     </AppLayout>
  *   )
  * }
- *
- * // With custom navigation items
- * export default function DashboardPage() {
- *   return (
- *     <AppLayout
- *       navItems={[
- *         { label: 'Apps', href: '/apps' },
- *         { label: 'Settings', href: '/settings' },
- *       ]}
- *     >
- *       <DashboardContent />
- *     </AppLayout>
- *   )
- * }
  * ```
  */
 export function AppLayout({
   children,
   navItems,
   className,
-  requireAuth = true,
 }: AppLayoutProps) {
-  const { data: session, status } = useSession()
+  const { data: session } = useSession()
 
-  // Handle authentication requirement
-  if (requireAuth) {
-    if (status === 'loading') {
-      return (
-        <div className="flex min-h-screen items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        </div>
-      )
-    }
-
-    if (status === 'unauthenticated' || !session) {
-      redirect('/login')
-    }
-  }
-
-  // Extract user info from session
+  // Extract user info from session (may be null for anonymous users)
   const user = {
     name: session?.user?.name,
     email: session?.user?.email,
@@ -91,7 +58,7 @@ export function AppLayout({
       <AppNavbar user={user} navItems={navItems} />
 
       {/* Main content area with top padding for fixed navbar */}
-      <main className={cn('pt-16', className)}>
+      <main className={cn('pt-14', className)}>
         {children}
       </main>
     </div>

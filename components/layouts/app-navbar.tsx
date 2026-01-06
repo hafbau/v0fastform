@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LogoFull, LogoIcon } from '@/components/logo'
+import { Logo, LogoIcon } from '@/components/logo'
 import { UserAvatarMenu, type UserAvatarMenuProps } from './user-avatar-menu'
 import { cn } from '@/lib/utils'
 
@@ -42,7 +42,7 @@ export function AppNavbar({
     <header
       className={cn(
         'fixed top-0 left-0 right-0 z-50',
-        'h-16 border-b border-border bg-background/95 backdrop-blur-sm',
+        'h-14 border-b border-border bg-background/95 backdrop-blur-sm',
         'supports-backdrop-filter:bg-background/80',
         className
       )}
@@ -56,9 +56,9 @@ export function AppNavbar({
               className="transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md"
               aria-label="Go to homepage"
             >
-              {/* Full logo on larger screens */}
+              {/* Logo on larger screens */}
               <div className="hidden sm:block">
-                <LogoFull />
+                <Logo />
               </div>
               {/* Icon only on mobile */}
               <div className="block sm:hidden">

@@ -1,8 +1,8 @@
-import { HomeClient } from '@/components/home/home-client'
-import { EnvSetup } from '@/components/env-setup'
-import { hasEnvVars, checkRequiredEnvVars } from '@/lib/env-check'
+import { EnvSetup } from '@/components/env-setup';
+import { hasEnvVars, checkRequiredEnvVars } from '@/lib/env-check';
+import { redirect } from 'next/navigation';
 
-export default function Home() {
+export default async function RootAppPage() {
   const isDevelopment = process.env.NODE_ENV === 'development'
 
   // Only show setup screen in development if environment variables are missing
@@ -10,6 +10,6 @@ export default function Home() {
     const missingVars = checkRequiredEnvVars()
     return <EnvSetup missingVars={missingVars} />
   }
-
-  return <HomeClient />
+  
+  return redirect('/apps');
 }

@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   title: 'fastform',
   description:
     'FastForm — Forms patients actually finish',
-    generator: 'v0.app'
+    generator: 'leadevs.com'
 }
 
 export default function RootLayout({

@@ -127,7 +127,9 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
             </div>
 
             {/* Form Card */}
-            <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">{children}</div>
+            <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+              {children}
+            </div>
 
             {/* Trust badges */}
             <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">
