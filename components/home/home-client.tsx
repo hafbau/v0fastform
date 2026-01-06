@@ -20,7 +20,7 @@ import {
   type ImageAttachment,
 } from '@/components/ai-elements/prompt-input'
 import { Suggestions, Suggestion } from '@/components/ai-elements/suggestion'
-import { AppHeader } from '@/components/shared/app-header'
+import { AppLayout } from '@/components/layouts'
 import { ChatMessages } from '@/components/chat/chat-messages'
 import { ChatInput } from '@/components/chat/chat-input'
 import { PreviewPanel } from '@/components/chat/preview-panel'
@@ -420,13 +420,11 @@ export function HomeClient() {
 
   if (showChatInterface) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black flex flex-col">
+      <AppLayout requireAuth={false} className="flex flex-col">
         {/* Handle search params with Suspense boundary */}
         <Suspense fallback={null}>
           <SearchParamsHandler onReset={handleReset} />
         </Suspense>
-
-        <AppHeader />
 
         <div className="flex flex-col h-[calc(100vh-64px-40px)] md:h-[calc(100vh-64px)]">
           <ResizableLayout
@@ -474,18 +472,16 @@ export function HomeClient() {
             />
           </div>
         </div>
-      </div>
+      </AppLayout>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black flex flex-col">
+    <AppLayout requireAuth={false} className="flex flex-col">
       {/* Handle search params with Suspense boundary */}
       <Suspense fallback={null}>
         <SearchParamsHandler onReset={handleReset} />
       </Suspense>
-
-      <AppHeader />
 
       {/* Main Content */}
       <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8">
@@ -554,6 +550,6 @@ export function HomeClient() {
           />
         </div>
       </div>
-    </div>
+    </AppLayout>
   )
 }
