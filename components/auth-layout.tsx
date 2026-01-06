@@ -1,6 +1,6 @@
 import type React from "react"
 import { Shield, Zap, Users, CheckCircle2 } from "lucide-react"
-import { Logo, LogoIcon } from "@/components/logo"
+import { LogoFull } from "@/components/logo"
 
 interface AuthLayoutProps {
   children: React.ReactNode
@@ -56,13 +56,10 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
 
         {/* Content */}
         <div className="relative z-10 flex flex-col justify-between p-12 xl:p-16 text-primary-foreground">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/20 backdrop-blur-sm font-extrabold tracking-tighter">
-              <span>ff</span>
-              <span className="text-accent">.</span>
-            </div>
-            <span className="text-xl font-extrabold tracking-tight">fastform</span>
-            <span className="h-2 w-2 rounded-full bg-accent" aria-hidden="true" />
+          <div
+            className="p-4 rounded-2xl bg-primary-foreground/60 w-fit"
+          >
+            <LogoFull />
           </div>
 
           {/* Main content */}
@@ -117,10 +114,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
       {/* Right Panel - Form */}
       <div className="flex w-full lg:w-1/2 xl:w-[45%] flex-col">
         <div className="flex items-center justify-between p-6 lg:hidden">
-          <div className="flex items-center gap-2.5">
-            <LogoIcon size="sm" />
-            <Logo className="text-lg" />
-          </div>
+          <LogoFull />
         </div>
 
         {/* Form container */}

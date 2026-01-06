@@ -33,17 +33,29 @@ export function LogoIcon({ className, size = "md" }: LogoIconProps) {
     lg: "h-12 w-12 text-lg",
   }
 
+  const dotSizeClasses = {
+    sm: "h-1 w-1",
+    md: "h-1.5 w-1.5",
+    lg: "h-2 w-2",
+  }
+
+  const [h, w, f] = (sizeClasses[size] || sizeClasses.md).split(" ")
   return (
-    <div
-      className={cn(
-        "flex items-center justify-center rounded-xl bg-primary/10 font-extrabold tracking-tighter text-foreground",
-        sizeClasses[size],
-        className,
-      )}
-      aria-label="fastform"
-    >
-      <span>ff</span>
-      <span className="text-primary">.</span>
+    <div className={cn(
+      "bg-primary/10 rounded-xl", h, w,
+      "flex items-center justify-center",)}>
+      <div
+        className={cn(
+          "flex items-baseline justify-center",
+          "font-extrabold tracking-tighter text-foreground",
+          f,
+          className,
+        )}
+        aria-label="fastform"
+      >
+        <span>ff</span>
+        <span className={cn(dotSizeClasses[size], "rounded-full bg-primary")} aria-hidden="true" />
+      </div>
     </div>
   )
 }
@@ -53,7 +65,7 @@ export function LogoIcon({ className, size = "md" }: LogoIconProps) {
  */
 export function LogoFull({ className }: LogoProps) {
   return (
-    <div className={cn("flex items-center gap-2.5", className)}>
+    <div className={cn("inline-flex max-w-fit items-center gap-2.5", className)}>
       <LogoIcon size="md" />
       <Logo />
     </div>
