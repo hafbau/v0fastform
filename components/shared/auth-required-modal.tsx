@@ -28,7 +28,7 @@ export function AuthRequiredModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Sign in to continue</DialogTitle>
+          <DialogTitle>Sign up or sign in to continue</DialogTitle>
           <DialogDescription>
             Create an account or sign in to start building with FastForm.
           </DialogDescription>
