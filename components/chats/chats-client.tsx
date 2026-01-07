@@ -1,8 +1,11 @@
 'use client'
 
+import { useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Plus } from 'lucide-react'
 import useSWR from 'swr'
+import { ChatInput } from '@/components/chat/chat-input'
+import { type ImageAttachment } from '@/components/ai-elements/prompt-input'
 
 interface V0Chat {
   id: string
@@ -26,20 +29,131 @@ interface ChatsClientProps {
 }
 
 export function ChatsClient({ appId }: ChatsClientProps) {
-  const { data, error, isLoading } = useSWR<ChatsResponse>(`/api/chats?appId=${appId}`)
+  const router = useRouter()
+  const { data, error, isLoading: isLoadingChats } = useSWR<ChatsResponse>(
+    `/api/chats?appId=${appId}`
+  )
   const chats = data?.data || []
+
+  // Chat input state
+  const [message, setMessage] = useState('')
+  const [attachments, setAttachments] = useState<ImageAttachment[]>([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const getFirstUserMessage = (chat: V0Chat) => {
     const firstUserMessage = chat.messages?.find((msg) => msg.role === 'user')
     return firstUserMessage?.content || 'No messages'
   }
 
+  const handleSubmit = async (
+    e: React.FormEvent<HTMLFormElement>,
+    submittedAttachments?: Array<{ url: string }>
+  ) => {
+    e.preventDefault()
+    if (!message.trim() || isSubmitting) return
+
+    setIsSubmitting(true)
+    const userMessage = message.trim()
+
+    try {
+      // Create chat with the message under this app
+      const chatResponse = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userMessage,
+          appId,
+          streaming: true,
+          attachments: submittedAttachments,
+        }),
+      })
+
+      if (!chatResponse.ok) {
+        throw new Error('Failed to create chat')
+      }
+
+      // Read the chat ID from the streaming response
+      const reader = chatResponse.body?.getReader()
+      if (!reader) {
+        throw new Error('No response body')
+      }
+
+      // Read chunks until we find the chat object
+      let chatId: string | null = null
+      const decoder = new TextDecoder()
+
+      while (!chatId) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const text = decoder.decode(value)
+        // Parse SSE data lines
+        const lines = text.split('\n')
+        for (const line of lines) {
+          if (line.startsWith('0:')) {
+            try {
+              const jsonStr = line.slice(2).trim()
+              const parsed = JSON.parse(jsonStr)
+              if (parsed.object === 'chat' && parsed.id) {
+                chatId = parsed.id
+                break
+              }
+            } catch {
+              // Continue parsing
+            }
+          }
+        }
+      }
+
+      // Cancel the reader since we got what we need
+      reader.cancel()
+
+      if (!chatId) {
+        throw new Error('Could not get chat ID from response')
+      }
+
+      // Clear message and redirect
+      setMessage('')
+      setAttachments([])
+      router.push(`/apps/${appId}/chats/${chatId}`)
+    } catch (error) {
+      console.error('Error creating chat:', error)
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {isLoading && (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white"></div>
+        {/* Chat Input Section - Always visible */}
+        <div className="mb-12">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">
+              Start a new conversation
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400">
+              Describe what you&apos;d like to build or continue working on
+            </p>
+          </div>
+          <div className="max-w-2xl mx-auto">
+            <ChatInput
+              message={message}
+              setMessage={setMessage}
+              onSubmit={handleSubmit}
+              isLoading={isSubmitting}
+              showSuggestions={true}
+              attachments={attachments}
+              onAttachmentsChange={setAttachments}
+              textareaRef={textareaRef}
+            />
+          </div>
+        </div>
+
+        {/* Chats Section */}
+        {isLoadingChats && (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 dark:border-white"></div>
             <span className="ml-2 text-gray-600 dark:text-gray-300">
               Loading chats...
             </span>
@@ -61,73 +175,42 @@ export function ChatsClient({ appId }: ChatsClientProps) {
           </div>
         )}
 
-        {!isLoading && !error && (
-          <>
-            <div className="mb-6 flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                  Chats
-                </h2>
-                <p className="text-gray-600 dark:text-gray-300">
-                  {chats.length} {chats.length === 1 ? 'chat' : 'chats'}
-                </p>
-              </div>
-              <Link
-                href={`/apps/${appId}/chats/new`}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                New Chat
-              </Link>
+        {!isLoadingChats && !error && chats.length > 0 && (
+          <div>
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Previous Chats
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {chats.length} {chats.length === 1 ? 'chat' : 'chats'}
+              </p>
             </div>
-
-            {chats.length === 0 ? (
-              <div className="text-center py-12">
-                <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
-                  No chats yet
-                </h3>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  Get started by creating your first chat.
-                </p>
-                <div className="mt-6">
-                  <Link
-                    href={`/apps/${appId}/chats/new`}
-                    className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    New Chat
-                  </Link>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {chats.map((chat) => (
-                  <Link
-                    key={chat.id}
-                    href={`/apps/${appId}/chats/${chat.id}`}
-                    className="group block"
-                  >
-                    <div className="border border-border dark:border-input rounded-lg p-6 hover:shadow-md transition-shadow">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-lg font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">
-                            {chat.name || getFirstUserMessage(chat)}
-                          </h3>
-                          <div className="mt-2 flex items-center text-sm text-gray-500 dark:text-gray-400">
-                            <span>{chat.messages?.length || 0} messages</span>
-                          </div>
-                          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                            Updated{' '}
-                            {new Date(chat.updatedAt).toLocaleDateString()}
-                          </p>
+            <div className="space-y-3">
+              {chats.map((chat) => (
+                <Link
+                  key={chat.id}
+                  href={`/apps/${appId}/chats/${chat.id}`}
+                  className="group block"
+                >
+                  <div className="border border-border dark:border-input rounded-lg p-4 hover:shadow-md transition-shadow bg-white dark:bg-gray-900">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-base font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">
+                          {chat.name || getFirstUserMessage(chat)}
+                        </h4>
+                        <div className="mt-1 flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+                          <span>{chat.messages?.length || 0} messages</span>
+                          <span>
+                            Updated {new Date(chat.updatedAt).toLocaleDateString()}
+                          </span>
                         </div>
                       </div>
                     </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
         )}
       </main>
     </div>
