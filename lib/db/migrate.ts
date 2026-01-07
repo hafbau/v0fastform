@@ -1,6 +1,9 @@
 import { drizzle } from "drizzle-orm/postgres-js"
 import { migrate } from "drizzle-orm/postgres-js/migrator"
+import { config } from "dotenv"
 import postgres from "postgres"
+
+config({ path: ".env", quiet: true })
 
 const runMigrate = async () => {
   if (!process.env.POSTGRES_URL) {

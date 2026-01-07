@@ -30,8 +30,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate appId for authenticated users
-    if (session?.user?.id && appId) {
+    // Validate appId for authenticated users - appId is REQUIRED
+    if (session?.user?.id) {
+      if (!appId) {
+        return NextResponse.json(
+          { error: 'appId is required for authenticated users' },
+          { status: 400 },
+        )
+      }
       const app = await getAppById({ appId })
       if (!app) {
         return NextResponse.json(
@@ -49,12 +55,12 @@ export async function POST(request: NextRequest) {
 
     if (session?.user?.id) {
       // Authenticated user - create ownership mapping
+      // appId is validated above; it's required for authenticated users
       await createChatOwnership({
         v0ChatId: chatId,
         userId: session.user.id,
-        appId, // optional during migration, required after
+        appId,
       })
-      console.log('Chat ownership created via API:', chatId, 'appId:', appId)
     } else {
       // Anonymous user - log for rate limiting
       const clientIP = getClientIP(request)
@@ -62,7 +68,6 @@ export async function POST(request: NextRequest) {
         ipAddress: clientIP,
         v0ChatId: chatId,
       })
-      console.log('Anonymous chat logged via API:', chatId, 'IP:', clientIP)
     }
 
     return NextResponse.json({ success: true })

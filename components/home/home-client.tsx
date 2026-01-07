@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import useSWR from 'swr'
+import Link from 'next/link'
 import {
   PromptInput,
   PromptInputImageButton,
@@ -25,6 +27,26 @@ import { PreviewPanel } from '@/components/chat/preview-panel'
 import { ResizableLayout } from '@/components/shared/resizable-layout'
 import { BottomToolbar } from '@/components/shared/bottom-toolbar'
 import { SuggestionsWidget } from '../ai-elements/suggestions-widget'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Plus } from 'lucide-react'
+
+// App type definition
+interface App {
+  id: string
+  userId: string
+  name: string
+  createdAt: string
+}
+
+interface AppsResponse {
+  data: App[]
+}
 
 // Component that uses useSearchParams - needs to be wrapped in Suspense
 function SearchParamsHandler({ onReset }: { onReset: () => void }) {
@@ -69,6 +91,19 @@ export function HomeClient() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [activePanel, setActivePanel] = useState<'chat' | 'preview'>('chat')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Fetch user's apps
+  const { data: appsData, isLoading: appsLoading } =
+    useSWR<AppsResponse>('/api/apps')
+  const apps = appsData?.data || []
+  const [selectedAppId, setSelectedAppId] = useState<string | null>(null)
+
+  // Auto-select first app when apps load
+  useEffect(() => {
+    if (apps.length > 0 && !selectedAppId) {
+      setSelectedAppId(apps[0].id)
+    }
+  }, [apps, selectedAppId])
 
   const handleReset = () => {
     // Reset all chat-related state
@@ -152,7 +187,7 @@ export function HomeClient() {
 
   const handleSendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (!message.trim() || isLoading) return
+    if (!message.trim() || isLoading || !selectedAppId) return
 
     const userMessage = message.trim()
     const currentAttachments = [...attachments]
@@ -182,6 +217,7 @@ export function HomeClient() {
         body: JSON.stringify({
           message: userMessage,
           streaming: true,
+          appId: selectedAppId,
           attachments: currentAttachments.map((att) => ({ url: att.dataUrl })),
         }),
       })
@@ -265,6 +301,7 @@ export function HomeClient() {
             },
             body: JSON.stringify({
               chatId: chatData.id,
+              appId: selectedAppId,
             }),
           })
         } catch (error) {
@@ -473,6 +510,52 @@ export function HomeClient() {
     )
   }
 
+  // Loading state while fetching apps
+  if (appsLoading) {
+    return (
+      <div>
+        <Suspense fallback={null}>
+          <SearchParamsHandler onReset={handleReset} />
+        </Suspense>
+        <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-2">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900 dark:border-white"></div>
+            <span className="text-gray-600 dark:text-gray-300">Loading...</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // No apps state - prompt user to create an app first
+  if (apps.length === 0) {
+    return (
+      <div>
+        <Suspense fallback={null}>
+          <SearchParamsHandler onReset={handleReset} />
+        </Suspense>
+        <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8">
+          <div className="max-w-md w-full text-center">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-4">
+              Create your first app
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-8">
+              Before you can start building, you need to create an app to
+              organize your chats.
+            </p>
+            <Link
+              href="/apps"
+              className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors"
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              Create an App
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div>
       {/* Handle search params with Suspense boundary */}
@@ -487,6 +570,36 @@ export function HomeClient() {
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
               What can we build together?
             </h2>
+          </div>
+
+          {/* App Selector */}
+          <div className="max-w-2xl mx-auto mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                Building in:
+              </span>
+              <Select
+                value={selectedAppId || undefined}
+                onValueChange={setSelectedAppId}
+              >
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Select an app" />
+                </SelectTrigger>
+                <SelectContent>
+                  {apps.map((app) => (
+                    <SelectItem key={app.id} value={app.id}>
+                      {app.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Link
+                href="/apps"
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                Manage apps
+              </Link>
+            </div>
           </div>
 
           {/* Prompt Input */}
@@ -510,13 +623,13 @@ export function HomeClient() {
                 value={message}
                 placeholder="Describe what you want to build..."
                 className="min-h-20 text-base"
-                disabled={isLoading}
+                disabled={isLoading || !selectedAppId}
               />
               <PromptInputToolbar>
                 <PromptInputTools>
                   <PromptInputImageButton
                     onImageSelect={handleImageFiles}
-                    disabled={isLoading}
+                    disabled={isLoading || !selectedAppId}
                   />
                 </PromptInputTools>
                 <PromptInputTools>
@@ -529,10 +642,10 @@ export function HomeClient() {
                     onError={(error) => {
                       console.error('Speech recognition error:', error)
                     }}
-                    disabled={isLoading}
+                    disabled={isLoading || !selectedAppId}
                   />
                   <PromptInputSubmit
-                    disabled={!message.trim() || isLoading}
+                    disabled={!message.trim() || isLoading || !selectedAppId}
                     status={isLoading ? 'streaming' : 'ready'}
                   />
                 </PromptInputTools>

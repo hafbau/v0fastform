@@ -48,8 +48,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate appId for new authenticated chats
-    if (!chatId && session?.user?.id && appId) {
+    // Validate appId for new authenticated chats - appId is REQUIRED for new chats
+    if (!chatId && session?.user?.id) {
+      if (!appId) {
+        return NextResponse.json(
+          { error: 'appId is required for new chats' },
+          { status: 400 },
+        )
+      }
       const app = await getAppById({ appId })
       if (!app) {
         return NextResponse.json(
@@ -85,13 +91,6 @@ export async function POST(request: NextRequest) {
       if (chatCount >= entitlementsByUserType[userType].maxMessagesPerDay) {
         return new ChatSDKError('rate_limit:chat').toResponse()
       }
-
-      console.log('API request:', {
-        message,
-        chatId,
-        streaming,
-        userId: session.user.id,
-      })
     } else {
       // Anonymous user rate limiting
       const clientIP = getClientIP(request)
@@ -111,16 +110,7 @@ export async function POST(request: NextRequest) {
       if (chatCount >= anonymousEntitlements.maxMessagesPerDay) {
         return new ChatSDKError('rate_limit:chat').toResponse()
       }
-
-      console.log('API request (anonymous):', {
-        message,
-        chatId,
-        streaming,
-        ip: clientIP,
-      })
     }
-
-    console.log('Using baseUrl:', process.env.V0_API_URL || 'default')
 
     let chat
 
@@ -128,18 +118,12 @@ export async function POST(request: NextRequest) {
       // continue existing chat
       if (streaming) {
         // Return streaming response for existing chat
-        console.log('Sending streaming message to existing chat:', {
-          chatId,
-          message,
-          responseMode: 'experimental_stream',
-        })
         chat = await v0.chats.sendMessage({
           chatId: chatId,
           message,
           responseMode: 'experimental_stream',
           ...(attachments && attachments.length > 0 && { attachments }),
         })
-        console.log('Streaming message sent to existing chat successfully')
 
         // Return the stream directly
         return new Response(chat as ReadableStream<Uint8Array>, {
@@ -161,17 +145,15 @@ export async function POST(request: NextRequest) {
       // create new chat
       if (streaming) {
         // Return streaming response
-        console.log('Creating streaming chat with params:', {
-          message,
-          responseMode: 'experimental_stream',
-        })
+        // NOTE: For streaming new chats, ownership is created CLIENT-SIDE via the
+        // handleChatData callback in home-client.tsx, which calls /api/chat/ownership
+        // after receiving the chat ID from the stream. This is by design since we
+        // cannot wait for stream completion server-side.
         chat = await v0.chats.create({
           message,
           responseMode: 'experimental_stream',
           ...(attachments && attachments.length > 0 && { attachments }),
         })
-        
-        console.log('Streaming chat created successfully')
 
         // Return the stream directly
         return new Response(chat as ReadableStream<Uint8Array>, {
@@ -183,31 +165,11 @@ export async function POST(request: NextRequest) {
         })
       } else {
         // Use sync mode
-        console.log('Creating sync chat with params:', {
-          message,
-          responseMode: 'sync',
-        })
         chat = await v0.chats.create({
           message,
           responseMode: 'sync',
           ...(attachments && attachments.length > 0 && { attachments }),
         })
-        console.log('Sync chat created successfully')
-        // console.log('Initializing repo-based chat with params:', {
-        //   message,
-        //   projectId,
-        // })
-        // chat = await v0.chats.init({
-        //   type: 'repo',
-        //   repo: {
-        //     url: 'https://github.com/hafbau/v2fastform', // Replace with your GitHub repository URL
-        //     branch: 'main', // Optional: specify the branch, defaults to the default branch
-        //   },
-        //   // Optional: you can also specify a projectId if you want to link it to an existing project
-        //   // projectId: 'your-project-id',
-        //   name: 'v2fastform', // Optional: name for the new v0 project/chat
-        // });
-        // console.log('Repo-based chat initialized successfully', { chat })
       }
     }
 
@@ -223,12 +185,12 @@ export async function POST(request: NextRequest) {
       try {
         if (session?.user?.id) {
           // Authenticated user - create ownership mapping
+          // appId is validated earlier in this route; it's required for new chats
           await createChatOwnership({
             v0ChatId: chatDetail.id,
             userId: session.user.id,
-            appId, // optional during migration, required after
+            appId,
           })
-          console.log('Chat ownership created:', chatDetail.id, 'appId:', appId)
         } else {
           // Anonymous user - log for rate limiting
           const clientIP = getClientIP(request)
@@ -236,7 +198,6 @@ export async function POST(request: NextRequest) {
             ipAddress: clientIP,
             v0ChatId: chatDetail.id,
           })
-          console.log('Anonymous chat logged:', chatDetail.id, 'IP:', clientIP)
         }
       } catch (error) {
         console.error('Failed to create chat ownership/log:', error)

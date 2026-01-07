@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
+import { ChevronLeft } from 'lucide-react'
 import { ChatMessages } from '@/components/chat/chat-messages'
 import { ChatInput } from '@/components/chat/chat-input'
 import { PreviewPanel } from '@/components/chat/preview-panel'
@@ -18,7 +20,6 @@ interface ChatDetailClientProps {
   chatId: string
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function ChatDetailClient({ appId, chatId }: ChatDetailClientProps) {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -73,7 +74,17 @@ export function ChatDetailClient({ appId, chatId }: ChatDetailClientProps) {
   }, [isLoadingChat])
 
   return (
-    <div className="flex flex-col h-[calc(100vh-56px-1px)] md:h-[calc(100vh-56px-1px)]">
+    <div className="flex flex-col h-[calc(100vh-56px)] md:h-[calc(100vh-56px)]">
+      {/* Back navigation to app's chat list */}
+      <div className="flex items-center px-4 py-2 border-b border-border dark:border-input bg-white dark:bg-black">
+        <Link
+          href={`/apps/${appId}/chats`}
+          className="flex items-center text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+        >
+          <ChevronLeft className="h-4 w-4 mr-1" />
+          Back to chats
+        </Link>
+      </div>
       <ResizableLayout
         className="flex-1 min-h-0"
         singlePanelMode={false}

@@ -40,7 +40,9 @@ export const chatOwnerships = pgTable(
     userId: uuid('userId')
       .notNull()
       .references(() => users.id),
-    appId: uuid('appId').references(() => apps.id), // nullable until data migration, then NOT NULL
+    appId: uuid('appId')
+      .notNull()
+      .references(() => apps.id),
     createdAt: timestamp('createdAt').notNull().defaultNow(),
   },
   (table) => ({

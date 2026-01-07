@@ -99,7 +99,7 @@
 
 ## Phase 4: Delete Obsolete Files
 
-- [ ] **Delete /apps/:appId/chats/new page** (ref: /apps/:appId/chats Page Refactor)
+- [x] **Delete /apps/:appId/chats/new page** (ref: /apps/:appId/chats Page Refactor)
   Task ID: phase-4-cleanup-01
   > **Implementation**: Delete `app/(app)/apps/[appId]/chats/new/` directory
   > **Details**:

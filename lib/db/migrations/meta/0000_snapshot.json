@@ -1,11 +1,11 @@
 {
-  "id": "52a0711d-7e1b-417e-bed1-4d24b22e21a2",
+  "id": "f54b2bbf-a82e-4f2f-b78b-ca2dff9808b2",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.anonymous_chat_logs": {
-      "name": "anonymous_chat_logs",
+    "public.anonymousChatLogs": {
+      "name": "anonymousChatLogs",
       "schema": "",
       "columns": {
         "id": {
@@ -15,20 +15,20 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "ip_address": {
-          "name": "ip_address",
+        "ipAddress": {
+          "name": "ipAddress",
           "type": "varchar(45)",
           "primaryKey": false,
           "notNull": true
         },
-        "v0_chat_id": {
-          "name": "v0_chat_id",
+        "v0ChatId": {
+          "name": "v0ChatId",
           "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true
         },
-        "created_at": {
-          "name": "created_at",
+        "createdAt": {
+          "name": "createdAt",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": true,
@@ -43,8 +43,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.chat_ownerships": {
-      "name": "chat_ownerships",
+    "public.apps": {
+      "name": "apps",
       "schema": "",
       "columns": {
         "id": {
@@ -54,26 +54,20 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "v0_chat_id": {
-          "name": "v0_chat_id",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
+        "userId": {
+          "name": "userId",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "v0_project_id": {
-          "name": "v0_project_id",
+        "name": {
+          "name": "name",
           "type": "varchar(255)",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
-        "created_at": {
-          "name": "created_at",
+        "createdAt": {
+          "name": "createdAt",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": true,
@@ -82,12 +76,16 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "chat_ownerships_user_id_users_id_fk": {
-          "name": "chat_ownerships_user_id_users_id_fk",
-          "tableFrom": "chat_ownerships",
+        "apps_userId_users_id_fk": {
+          "name": "apps_userId_users_id_fk",
+          "tableFrom": "apps",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -98,8 +96,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.project_ownerships": {
-      "name": "project_ownerships",
+    "public.chatOwnerships": {
+      "name": "chatOwnerships",
       "schema": "",
       "columns": {
         "id": {
@@ -109,20 +107,26 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "v0_project_id": {
-          "name": "v0_project_id",
+        "v0ChatId": {
+          "name": "v0ChatId",
           "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true
         },
-        "user_id": {
-          "name": "user_id",
+        "userId": {
+          "name": "userId",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "created_at": {
-          "name": "created_at",
+        "appId": {
+          "name": "appId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": true,
@@ -131,18 +135,43 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "project_ownerships_user_id_users_id_fk": {
-          "name": "project_ownerships_user_id_users_id_fk",
-          "tableFrom": "project_ownerships",
+        "chatOwnerships_userId_users_id_fk": {
+          "name": "chatOwnerships_userId_users_id_fk",
+          "tableFrom": "chatOwnerships",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "chatOwnerships_appId_apps_id_fk": {
+          "name": "chatOwnerships_appId_apps_id_fk",
+          "tableFrom": "chatOwnerships",
+          "tableTo": "apps",
+          "columnsFrom": [
+            "appId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "chatOwnerships_v0ChatId_unique": {
+          "name": "chatOwnerships_v0ChatId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "v0ChatId"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -170,8 +199,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_at": {
-          "name": "created_at",
+        "createdAt": {
+          "name": "createdAt",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": true,

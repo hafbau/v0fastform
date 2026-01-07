@@ -120,6 +120,10 @@ export async function deleteApp({ appId }: { appId: string }) {
 }
 
 // Chat ownership functions
+/**
+ * Creates a chat ownership record linking a v0 chat to a user and app.
+ * All chats must belong to an app (no orphan chats allowed).
+ */
 export async function createChatOwnership({
   v0ChatId,
   userId,
@@ -127,7 +131,7 @@ export async function createChatOwnership({
 }: {
   v0ChatId: string
   userId: string
-  appId?: string // optional during migration, required for new chats
+  appId: string
 }) {
   try {
     const db = getDb()
