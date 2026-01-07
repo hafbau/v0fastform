@@ -90,14 +90,14 @@ export function AppsListClient() {
       const appData = await appResponse.json()
       const appId = appData.data.id
 
-      // 2. Create chat with the message
+      // 2. Create chat with the message (non-streaming to get chatId directly)
       const chatResponse = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userMessage,
           appId,
-          streaming: true,
+          streaming: false,
           attachments: submittedAttachments,
         }),
       })
@@ -106,48 +106,14 @@ export function AppsListClient() {
         throw new Error('Failed to create chat')
       }
 
-      // 3. Read the chat ID from the streaming response
-      // The chat API returns a streaming response, so we need to parse the first chunk
-      const reader = chatResponse.body?.getReader()
-      if (!reader) {
-        throw new Error('No response body')
-      }
-
-      // Read chunks until we find the chat object
-      let chatId: string | null = null
-      const decoder = new TextDecoder()
-
-      while (!chatId) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        const text = decoder.decode(value)
-        // Parse SSE data lines
-        const lines = text.split('\n')
-        for (const line of lines) {
-          if (line.startsWith('0:')) {
-            try {
-              const jsonStr = line.slice(2).trim()
-              const parsed = JSON.parse(jsonStr)
-              if (parsed.object === 'chat' && parsed.id) {
-                chatId = parsed.id
-                break
-              }
-            } catch {
-              // Continue parsing
-            }
-          }
-        }
-      }
-
-      // Cancel the reader since we got what we need
-      reader.cancel()
+      const chatData = await chatResponse.json()
+      const chatId = chatData.id
 
       if (!chatId) {
         throw new Error('Could not get chat ID from response')
       }
 
-      // 4. Clear message and redirect
+      // 3. Clear message and redirect
       setMessage('')
       setAttachments([])
       router.push(`/apps/${appId}/chats/${chatId}`)

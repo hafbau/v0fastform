@@ -57,14 +57,14 @@ export function ChatsClient({ appId }: ChatsClientProps) {
     const userMessage = message.trim()
 
     try {
-      // Create chat with the message under this app
+      // Create chat with the message under this app (non-streaming to get chatId directly)
       const chatResponse = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userMessage,
           appId,
-          streaming: true,
+          streaming: false,
           attachments: submittedAttachments,
         }),
       })
@@ -73,41 +73,8 @@ export function ChatsClient({ appId }: ChatsClientProps) {
         throw new Error('Failed to create chat')
       }
 
-      // Read the chat ID from the streaming response
-      const reader = chatResponse.body?.getReader()
-      if (!reader) {
-        throw new Error('No response body')
-      }
-
-      // Read chunks until we find the chat object
-      let chatId: string | null = null
-      const decoder = new TextDecoder()
-
-      while (!chatId) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        const text = decoder.decode(value)
-        // Parse SSE data lines
-        const lines = text.split('\n')
-        for (const line of lines) {
-          if (line.startsWith('0:')) {
-            try {
-              const jsonStr = line.slice(2).trim()
-              const parsed = JSON.parse(jsonStr)
-              if (parsed.object === 'chat' && parsed.id) {
-                chatId = parsed.id
-                break
-              }
-            } catch {
-              // Continue parsing
-            }
-          }
-        }
-      }
-
-      // Cancel the reader since we got what we need
-      reader.cancel()
+      const chatData = await chatResponse.json()
+      const chatId = chatData.id
 
       if (!chatId) {
         throw new Error('Could not get chat ID from response')
