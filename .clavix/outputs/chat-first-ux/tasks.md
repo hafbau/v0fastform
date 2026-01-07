@@ -111,7 +111,7 @@
 
 ## Phase 5: API Updates (if needed)
 
-- [ ] **Verify /api/chat supports appId for new chat creation** (ref: /apps Page Refactor)
+- [x] **Verify /api/chat supports appId for new chat creation** (ref: /apps Page Refactor)
   Task ID: phase-5-api-01
   > **Implementation**: Review `app/api/chat/route.ts`
   > **Details**:
