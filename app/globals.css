@@ -183,3 +183,65 @@
     @apply leading-relaxed;
   }
 }
+
+/* Gradient mesh animations - subtle, performant floating effect */
+@keyframes mesh-float {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(5%, 5%) scale(1.05);
+  }
+  50% {
+    transform: translate(0, 10%) scale(1);
+  }
+  75% {
+    transform: translate(-5%, 5%) scale(1.02);
+  }
+}
+
+@keyframes mesh-float-delayed {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(-5%, 5%) scale(1.02);
+  }
+  50% {
+    transform: translate(-10%, 0) scale(1.05);
+  }
+  75% {
+    transform: translate(-5%, -5%) scale(1);
+  }
+}
+
+@keyframes mesh-float-slow {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(5%, -5%) scale(1.03);
+  }
+  66% {
+    transform: translate(-5%, 5%) scale(1);
+  }
+}
+
+@layer utilities {
+  .animate-mesh-float {
+    animation: mesh-float 20s ease-in-out infinite;
+  }
+
+  .animate-mesh-float-delayed {
+    animation: mesh-float-delayed 25s ease-in-out infinite;
+    animation-delay: -5s;
+  }
+
+  .animate-mesh-float-slow {
+    animation: mesh-float-slow 30s ease-in-out infinite;
+    animation-delay: -10s;
+  }
+}
