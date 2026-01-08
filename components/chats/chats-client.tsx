@@ -6,6 +6,9 @@ import Link from 'next/link'
 import useSWR from 'swr'
 import { ChatInput } from '@/components/chat/chat-input'
 import { type ImageAttachment } from '@/components/ai-elements/prompt-input'
+import IntentConfirmation from '@/components/chat/intent-confirmation'
+import type { FastformAppSpec } from '@/lib/types/appspec'
+import { useToast } from '@/hooks/use-toast'
 
 interface V0Chat {
   id: string
@@ -30,6 +33,7 @@ interface ChatsClientProps {
 
 export function ChatsClient({ appId }: ChatsClientProps) {
   const router = useRouter()
+  const { toast } = useToast()
   const { data, error, isLoading: isLoadingChats } = useSWR<ChatsResponse>(
     `/api/chats?appId=${appId}`
   )
@@ -39,6 +43,12 @@ export function ChatsClient({ appId }: ChatsClientProps) {
   const [message, setMessage] = useState('')
   const [attachments, setAttachments] = useState<ImageAttachment[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  // Intent confirmation state
+  const [draftSpec, setDraftSpec] = useState<FastformAppSpec | null>(null)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [showIntentConfirmation, setShowIntentConfirmation] = useState(false)
+  
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const getFirstUserMessage = (chat: V0Chat) => {
@@ -46,24 +56,21 @@ export function ChatsClient({ appId }: ChatsClientProps) {
     return firstUserMessage?.content || 'No messages'
   }
 
-  const handleSubmit = async (
-    e: React.FormEvent<HTMLFormElement>,
-    submittedAttachments?: Array<{ url: string }>
+  // Core logic to create chat
+  const createChat = async (
+    userMessage: string, 
+    submittedAttachments: Array<{ url: string }> | undefined,
+    currentSessionId: string | null
   ) => {
-    e.preventDefault()
-    if (!message.trim() || isSubmitting) return
-
-    setIsSubmitting(true)
-    const userMessage = message.trim()
-
     try {
-      // Create chat with the message under this app (non-streaming to get chatId directly)
+      // Create chat with the message under this app
       const chatResponse = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userMessage,
           appId,
+          sessionId: currentSessionId, // Pass existing session ID if refining
           streaming: false,
           attachments: submittedAttachments,
         }),
@@ -74,6 +81,16 @@ export function ChatsClient({ appId }: ChatsClientProps) {
       }
 
       const chatData = await chatResponse.json()
+      
+      // Handle Intent Confirmation Flow
+      if (chatData.type === 'intent-confirmation') {
+        setDraftSpec(chatData.draftSpec)
+        setSessionId(chatData.sessionId)
+        setShowIntentConfirmation(true)
+        setIsSubmitting(false)
+        return
+      }
+
       const chatId = chatData.id
 
       if (!chatId) {
@@ -83,15 +100,107 @@ export function ChatsClient({ appId }: ChatsClientProps) {
       // Clear message and redirect
       setMessage('')
       setAttachments([])
+      setSessionId(null)
       router.push(`/apps/${appId}/chats/${chatId}`)
     } catch (error) {
       console.error('Error creating chat:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to create chat. Please try again.',
+        variant: 'destructive',
+      })
       setIsSubmitting(false)
     }
   }
 
+  const handleSubmit = async (
+    e: React.FormEvent<HTMLFormElement>,
+    submittedAttachments?: Array<{ url: string }>
+  ) => {
+    e.preventDefault()
+    if (!message.trim() || isSubmitting) return
+
+    setIsSubmitting(true)
+    const formattedAttachments = submittedAttachments 
+      ? submittedAttachments 
+      : attachments.map(a => ({ url: a.url }))
+
+    await createChat(message.trim(), formattedAttachments, sessionId)
+  }
+
+  const handleConfirm = async (editedSpec: FastformAppSpec) => {
+    setIsSubmitting(true)
+
+    try {
+      // 1. Persist the AppSpec to the database
+      const response = await fetch(`/api/apps/${appId}/appspec`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          spec: editedSpec,
+          sessionId,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(
+          errorData.error || 'Failed to persist AppSpec. Please try again.'
+        )
+      }
+
+      // 2. Hide confirmation
+      setShowIntentConfirmation(false)
+      setDraftSpec(null) // Clear draft spec
+      
+      // 3. Create the actual chat
+      // We start the chat with the ORIGINAL message (still in 'message' state)
+      // The backend will now see the app has a spec and skip draft generation
+      const formattedAttachments = attachments.map(a => ({ url: a.url }))
+      await createChat(message.trim(), formattedAttachments, sessionId)
+      
+    } catch (error) {
+       console.error('Error confirming AppSpec:', error)
+       toast({
+        title: 'Failed to confirm app spec',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'An unexpected error occurred. Please try again.',
+        variant: 'destructive',
+      })
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleRefine = () => {
+    setShowIntentConfirmation(false)
+    setIsSubmitting(false)
+    // Focus the textarea for immediate typing
+    if (textareaRef.current) {
+      textareaRef.current.focus()
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black">
+    <div className="min-h-screen bg-gray-50 dark:bg-black relative">
+      {/* Intent Confirmation Modal */}
+      {showIntentConfirmation && draftSpec && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
+             <div className="w-full max-w-4xl bg-background rounded-lg shadow-xl overflow-hidden my-auto">
+                <div className="max-h-[85vh] overflow-y-auto">
+                  <IntentConfirmation 
+                      draftSpec={draftSpec}
+                      onConfirm={handleConfirm}
+                      onRefine={handleRefine}
+                  />
+                </div>
+             </div>
+        </div>
+      )}
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Chat Input Section - Always visible */}
         <div className="mb-12">

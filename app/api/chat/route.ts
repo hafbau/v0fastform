@@ -89,6 +89,8 @@ export async function POST(request: NextRequest) {
     // This validation runs BEFORE AppSpec generation to ensure user has
     // permission to generate AppSpecs for this app.
     // ========================================================================
+    let app: Awaited<ReturnType<typeof getAppById>>
+
     if (!chatId && session?.user?.id) {
       if (!appId) {
         return NextResponse.json(
@@ -96,7 +98,7 @@ export async function POST(request: NextRequest) {
           { status: 400 },
         )
       }
-      const app = await getAppById({ appId })
+      app = await getAppById({ appId })
       if (!app) {
         return NextResponse.json(
           { error: 'App not found' },
@@ -125,7 +127,10 @@ export async function POST(request: NextRequest) {
     // NOTE: App ownership is validated above before we reach this point.
     // ========================================================================
 
-    if (!chatId && appId && session?.user?.id) {
+    // helper to check if app spec is empty
+    const isSpecEmpty = app && (!app.spec || (typeof app.spec === 'object' && Object.keys(app.spec).length === 0))
+
+    if (!chatId && appId && session?.user?.id && isSpecEmpty) {
       try {
         let draftSpec: FastformAppSpec
         let currentSessionId: string
@@ -324,15 +329,16 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      id: chatDetail.id,
-      demo: chatDetail.demo,
-      messages: chatDetail.messages?.map((msg) => ({
-        ...msg,
-        experimental_content: (msg as any).experimental_content,
-      })),
-    })
-  } catch (error) {
-    console.error('V0 API Error:', error)
+	      id: chatDetail.id,
+	      demo: chatDetail.demo,
+	      messages: chatDetail.messages?.map((msg) => ({
+	        ...msg,
+	        experimental_content: (msg as Record<string, unknown>)
+	          .experimental_content,
+	      })),
+	    })
+	  } catch (error) {
+	    console.error('V0 API Error:', error)
 
     // Log more detailed error information
     if (error instanceof Error) {
