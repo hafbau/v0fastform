@@ -19,7 +19,7 @@
 
 ## Phase 1: Design System Foundation
 
-- [ ] **Create Animated Gradient Mesh Background** (ref: Modern Auth Pages, Animated Background)
+- [x] **Create Animated Gradient Mesh Background** (ref: Modern Auth Pages, Animated Background)
   Task ID: phase-1-design-01
   > **Implementation**: Create `components/ui/gradient-mesh.tsx`
   > **Details**:
@@ -29,7 +29,7 @@
   > - Support both light and dark mode via CSS variables
   > - Export as `<GradientMesh />` for use in auth pages
 
-- [ ] **Add Glassmorphism CSS Classes** (ref: Glassmorphism UI)
+- [x] **Add Glassmorphism CSS Classes** (ref: Glassmorphism UI)
   Task ID: phase-1-design-02
   > **Implementation**: Edit `app/globals.css`
   > **Details**:

@@ -218,6 +218,9 @@ export const {
   signOut,
 } = NextAuth({
   ...authConfig,
+  // Credentials auth issues JWTs; explicitly use JWT sessions so `/api/auth/session`
+  // decodes the token instead of expecting database-backed sessions.
+  session: { strategy: "jwt" },
   providers: buildProviders(),
   adapter: {
     // Use custom verification token adapter for magic links
