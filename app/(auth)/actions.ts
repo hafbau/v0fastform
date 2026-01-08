@@ -75,6 +75,45 @@ export async function signInAction(
   }
 }
 
+const forgotPasswordSchema = z.object({
+  email: z.string().email('Please enter a valid email.'),
+})
+
+export async function requestPasswordReset(
+  email: string,
+): Promise<ActionResult> {
+  try {
+    const validated = forgotPasswordSchema.parse({ email })
+
+    // Check if user exists (don't reveal if they don't for security)
+    const existingUsers = await getUser(validated.email)
+
+    if (existingUsers.length > 0) {
+      // TODO: Phase 4 - Generate token and send email
+      // For now, we log the request
+      console.log('[Password Reset] Request for:', validated.email)
+    }
+
+    // Always return success to prevent email enumeration
+    return {
+      type: 'success',
+      message: 'If an account exists, you will receive a password reset email.',
+    }
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return {
+        type: 'error',
+        message: error.issues[0].message,
+      }
+    }
+
+    return {
+      type: 'error',
+      message: 'Something went wrong. Please try again.',
+    }
+  }
+}
+
 export async function signUpAction(
   _prevState: ActionResult | undefined,
   formData: FormData,
