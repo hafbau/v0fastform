@@ -29,7 +29,7 @@
 
 ### Database Schema
 
-- [ ] **Add `spec` JSONB column to apps table** (ref: Technical Constraints)
+- [x] **Add `spec` JSONB column to apps table** (ref: Technical Constraints)
   Task ID: `phase-1-foundation-01`
   > **Implementation**: Edit `lib/db/schema.ts`
   > **Details**:
@@ -482,7 +482,7 @@
 
 ### Environment Variables
 
-- [ ] **Document required environment variables** (ref: Technical implementation)
+- [x] **Document required environment variables** (ref: Technical implementation)
   Task ID: `phase-9-config-01`
   > **Implementation**: Update `.env.example`
   > **Details**:
@@ -534,7 +534,7 @@
 
 ### Developer Documentation
 
-- [ ] **Create architecture documentation** (ref: Architecture Decisions)
+- [x] **Create architecture documentation** (ref: Architecture Decisions)
   Task ID: `phase-10-docs-01`
   > **Implementation**: Create `docs/architecture.md`
   > **Details**:
@@ -546,7 +546,7 @@
   >   - Auth injection for generated apps
   > - Include diagrams (Mermaid or ASCII)
 
-- [ ] **Create AppSpec development guide** (ref: Template-based initialization)
+- [x] **Create AppSpec development guide** (ref: Template-based initialization)
   Task ID: `phase-10-docs-02`
   > **Implementation**: Create `docs/appspec-guide.md`
   > **Details**:
