@@ -1,6 +1,15 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '../auth'
 import { AuthForm } from '@/components/auth-form'
+import {
+  GlassCard,
+  GlassCardHeader,
+  GlassCardTitle,
+  GlassCardDescription,
+  GlassCardContent,
+  GlassCardFooter,
+} from '@/components/ui/glass-card'
 
 export default async function LoginPage() {
   const session = await auth()
@@ -10,18 +19,35 @@ export default async function LoginPage() {
   }
 
   return (
-    <div className="flex h-screen w-screen items-center justify-center bg-background">
-      <div className="w-full max-w-md overflow-hidden rounded-2xl border border-border shadow-xl">
-        <div className="flex flex-col items-center justify-center space-y-3 border-b border-border bg-background px-4 py-6 pt-8 text-center sm:px-16">
-          <h3 className="text-xl font-semibold text-foreground">Sign In</h3>
-          <p className="text-sm text-muted-foreground">
-            Use your email and password to sign in
-          </p>
-        </div>
-        <div className="flex flex-col space-y-4 bg-muted/50 px-4 py-8 sm:px-16">
-          <AuthForm type="signin" />
-        </div>
-      </div>
-    </div>
+    <GlassCard className="animate-in fade-in duration-500">
+      <GlassCardHeader className="text-center">
+        <GlassCardTitle>Welcome back</GlassCardTitle>
+        <GlassCardDescription>
+          Sign in to your account to continue
+        </GlassCardDescription>
+      </GlassCardHeader>
+
+      <GlassCardContent>
+        <AuthForm type="signin" />
+      </GlassCardContent>
+
+      <GlassCardFooter className="flex-col gap-4">
+        <Link
+          href="/forgot-password"
+          className="text-sm text-muted-foreground hover:text-primary transition-colors"
+        >
+          Forgot your password?
+        </Link>
+        <p className="text-sm text-muted-foreground">
+          Don&apos;t have an account?{' '}
+          <Link
+            href="/register"
+            className="font-medium text-primary hover:text-primary/80 transition-colors"
+          >
+            Sign up
+          </Link>
+        </p>
+      </GlassCardFooter>
+    </GlassCard>
   )
 }
