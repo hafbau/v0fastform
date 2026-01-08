@@ -1,8 +1,8 @@
 import "server-only"
 
-import { and, count, desc, eq, gte } from "drizzle-orm"
+import { and, count, desc, eq, gte, lt } from "drizzle-orm"
 
-import { users, apps, chatOwnerships, anonymousChatLogs, submissions, submissionHistory, type User, type App, type Submission, type SubmissionHistory } from "./schema"
+import { users, apps, chatOwnerships, anonymousChatLogs, submissions, submissionHistory, verificationTokens, type User, type App, type Submission, type SubmissionHistory, type VerificationToken } from "./schema"
 import { generateUUID } from "../utils"
 import { generateHashedPassword } from "./utils"
 import { getDb } from "./connection"
@@ -586,5 +586,144 @@ export async function createSubmissionHistory({
   } catch (error) {
     console.error("Failed to create submission history in database:", error)
     throw error
+  }
+}
+
+// Password reset token functions
+/**
+ * Creates a password reset token for a user.
+ * Uses the verificationTokens table with identifier as email.
+ */
+export async function createPasswordResetToken({
+  email,
+  token,
+  expiresInHours = 1,
+}: {
+  email: string
+  token: string
+  expiresInHours?: number
+}): Promise<VerificationToken> {
+  try {
+    const db = getDb()
+    const expires = new Date(Date.now() + expiresInHours * 60 * 60 * 1000)
+
+    // Delete any existing tokens for this email first
+    await db
+      .delete(verificationTokens)
+      .where(eq(verificationTokens.identifier, email))
+
+    // Create new token
+    const [result] = await db
+      .insert(verificationTokens)
+      .values({
+        identifier: email,
+        token,
+        expires,
+      })
+      .returning()
+
+    return result
+  } catch (error) {
+    console.error("Failed to create password reset token:", error)
+    throw error
+  }
+}
+
+/**
+ * Gets a password reset token by token string.
+ * Returns null if token doesn't exist or is expired.
+ */
+export async function getPasswordResetToken({
+  token,
+}: {
+  token: string
+}): Promise<VerificationToken | null> {
+  try {
+    const db = getDb()
+    const [tokenRecord] = await db
+      .select()
+      .from(verificationTokens)
+      .where(eq(verificationTokens.token, token))
+
+    if (!tokenRecord) {
+      return null
+    }
+
+    // Check if token is expired
+    if (tokenRecord.expires < new Date()) {
+      // Delete expired token
+      await db
+        .delete(verificationTokens)
+        .where(eq(verificationTokens.token, token))
+      return null
+    }
+
+    return tokenRecord
+  } catch (error) {
+    console.error("Failed to get password reset token:", error)
+    return null
+  }
+}
+
+/**
+ * Deletes a password reset token after use.
+ */
+export async function deletePasswordResetToken({
+  token,
+}: {
+  token: string
+}): Promise<void> {
+  try {
+    const db = getDb()
+    await db
+      .delete(verificationTokens)
+      .where(eq(verificationTokens.token, token))
+  } catch (error) {
+    console.error("Failed to delete password reset token:", error)
+    throw error
+  }
+}
+
+/**
+ * Updates a user's password.
+ */
+export async function updateUserPassword({
+  email,
+  password,
+}: {
+  email: string
+  password: string
+}): Promise<User | null> {
+  try {
+    const db = getDb()
+    const hashedPassword = generateHashedPassword(password)
+
+    const [user] = await db
+      .update(users)
+      .set({ password: hashedPassword })
+      .where(eq(users.email, email))
+      .returning()
+
+    return user || null
+  } catch (error) {
+    console.error("Failed to update user password:", error)
+    throw error
+  }
+}
+
+/**
+ * Cleans up expired password reset tokens.
+ */
+export async function cleanupExpiredTokens(): Promise<number> {
+  try {
+    const db = getDb()
+    const result = await db
+      .delete(verificationTokens)
+      .where(lt(verificationTokens.expires, new Date()))
+
+    return result.rowCount || 0
+  } catch (error) {
+    console.error("Failed to cleanup expired tokens:", error)
+    return 0
   }
 }

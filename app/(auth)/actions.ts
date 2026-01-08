@@ -1,8 +1,17 @@
 'use server'
 
 import { z } from 'zod'
+import crypto from 'crypto'
 import { signIn } from './auth'
-import { createUser, getUser } from '@/lib/db/queries'
+import {
+  createUser,
+  getUser,
+  createPasswordResetToken,
+  getPasswordResetToken,
+  deletePasswordResetToken,
+  updateUserPassword,
+} from '@/lib/db/queries'
+import { sendPasswordResetEmail, isSmtpConfigured } from '@/lib/email/password-reset'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { AuthError } from 'next-auth'
@@ -89,9 +98,29 @@ export async function requestPasswordReset(
     const existingUsers = await getUser(validated.email)
 
     if (existingUsers.length > 0) {
-      // TODO: Phase 4 - Generate token and send email
-      // For now, we log the request
-      console.log('[Password Reset] Request for:', validated.email)
+      // Generate a secure random token
+      const token = crypto.randomBytes(32).toString('hex')
+
+      // Store token in database (expires in 1 hour)
+      await createPasswordResetToken({
+        email: validated.email,
+        token,
+        expiresInHours: 1,
+      })
+
+      // Send email if SMTP is configured
+      if (isSmtpConfigured()) {
+        await sendPasswordResetEmail({
+          email: validated.email,
+          token,
+        })
+      } else {
+        // In development, log the reset link
+        console.log(
+          '[Password Reset] SMTP not configured. Reset link:',
+          `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/reset-password?token=${token}`
+        )
+      }
     }
 
     // Always return success to prevent email enumeration
@@ -107,6 +136,7 @@ export async function requestPasswordReset(
       }
     }
 
+    console.error('[Password Reset] Error:', error)
     return {
       type: 'error',
       message: 'Something went wrong. Please try again.',
@@ -179,19 +209,33 @@ const resetPasswordSchema = z.object({
 export async function validateResetToken(
   token: string,
 ): Promise<ActionResult> {
-  // TODO: Phase 4 - Validate token from database
-  // For now, we accept any non-empty token for UI development
-  if (!token || token.length < 10) {
+  if (!token) {
     return {
       type: 'error',
-      message: 'Invalid or expired reset link.',
+      message: 'No reset token provided.',
     }
   }
 
-  // Placeholder: token validation will be implemented in Phase 4
-  return {
-    type: 'success',
-    message: 'Token is valid.',
+  try {
+    const tokenRecord = await getPasswordResetToken({ token })
+
+    if (!tokenRecord) {
+      return {
+        type: 'error',
+        message: 'Invalid or expired reset link.',
+      }
+    }
+
+    return {
+      type: 'success',
+      message: 'Token is valid.',
+    }
+  } catch (error) {
+    console.error('[Password Reset] Token validation error:', error)
+    return {
+      type: 'error',
+      message: 'Something went wrong. Please try again.',
+    }
   }
 }
 
@@ -202,10 +246,32 @@ export async function resetPassword(
   try {
     const validated = resetPasswordSchema.parse({ token, password: newPassword })
 
-    // TODO: Phase 4 - Validate token, update password in database
-    console.log('[Password Reset] Resetting password with token:', validated.token)
+    // Get and validate the token
+    const tokenRecord = await getPasswordResetToken({ token: validated.token })
 
-    // Placeholder: password reset will be implemented in Phase 4
+    if (!tokenRecord) {
+      return {
+        type: 'error',
+        message: 'Invalid or expired reset link.',
+      }
+    }
+
+    // Update the user's password
+    const user = await updateUserPassword({
+      email: tokenRecord.identifier,
+      password: validated.password,
+    })
+
+    if (!user) {
+      return {
+        type: 'error',
+        message: 'Failed to update password. Please try again.',
+      }
+    }
+
+    // Delete the used token
+    await deletePasswordResetToken({ token: validated.token })
+
     return {
       type: 'success',
       message: 'Password has been reset successfully.',
@@ -218,6 +284,7 @@ export async function resetPassword(
       }
     }
 
+    console.error('[Password Reset] Error:', error)
     return {
       type: 'error',
       message: 'Something went wrong. Please try again.',
