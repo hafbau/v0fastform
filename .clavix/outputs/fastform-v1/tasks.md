@@ -150,7 +150,7 @@
 
 ### Intent Confirmation Component
 
-- [ ] **Create rich intent confirmation chat message component** (ref: Intent Confirmation Flow)
+- [x] **Create rich intent confirmation chat message component** (ref: Intent Confirmation Flow)
   Task ID: `phase-4-chat-ui-01`
   > **Implementation**: Create `components/chat/intent-confirmation.tsx`
   > **Details**:
@@ -164,10 +164,11 @@
   > - Use Radix Dialog for richer layout (optional)
   > - On confirm: call `onConfirm()`, persist AppSpec to DB
   > - On refine: close component, user continues chat
+  > **Completed**: 2026-01-08 | Component with rich preview UI | Commit: 38249f5
 
 ### Chat API Modifications
 
-- [ ] **Extend `/api/chat` to handle AppSpec generation** (ref: Chat-to-AppSpec Pipeline)
+- [x] **Extend `/api/chat` to handle AppSpec generation** (ref: Chat-to-AppSpec Pipeline)
   Task ID: `phase-4-chat-ui-02`
   > **Implementation**: Edit `app/api/chat/route.ts`
   > **Details**:
@@ -184,8 +185,9 @@
   >     3. Update draft in memory
   >     4. Return updated draft
   > - Use existing v0 SDK for preview generation (unchanged)
+  > **Completed**: 2026-01-08 | In-memory storage + 9 tests | Commit: 38249f5
 
-- [ ] **Add AppSpec persistence endpoint** (ref: Draft AppSpec in Memory)
+- [x] **Add AppSpec persistence endpoint** (ref: Draft AppSpec in Memory)
   Task ID: `phase-4-chat-ui-03`
   > **Implementation**: Create `app/api/apps/[appId]/appspec/route.ts`
   > **Details**:
@@ -194,10 +196,11 @@
   > - Update Drizzle query: `db.update(apps).set({ spec: draftSpec }).where(eq(apps.id, appId))`
   > - Return success + trigger prompt compilation
   > - This endpoint called when user clicks "Confirm & Build"
+  > **Completed**: 2026-01-08 | POST + GET handlers | Commit: 38249f5
 
 ### Frontend Integration
 
-- [ ] **Update `ChatDetailClient` to handle intent confirmation** (ref: Intent Confirmation Flow)
+- [x] **Update `ChatDetailClient` to handle intent confirmation** (ref: Intent Confirmation Flow)
   Task ID: `phase-4-chat-ui-04`
   > **Implementation**: Edit `components/chats/chat-detail-client.tsx`
   > **Details**:
@@ -206,6 +209,7 @@
   > - On confirm: POST to `/api/apps/[appId]/appspec`, then show "Building..." state
   > - On refine: hide confirmation, user continues typing in chat input
   > - After confirmation persisted, trigger v0 generation flow
+  > **Completed**: 2026-01-08 | Full intent confirmation flow | Commit: 38249f5
 
 ---
 
