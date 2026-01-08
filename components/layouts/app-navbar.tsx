@@ -46,8 +46,7 @@ export function AppNavbar({
     <header
       className={cn(
         'fixed top-0 left-0 right-0 z-50',
-        'h-14 border-b border-border bg-background/95 backdrop-blur-sm',
-        'supports-backdrop-filter:bg-background/80',
+        'h-14 glass-navbar',
         className
       )}
     >
