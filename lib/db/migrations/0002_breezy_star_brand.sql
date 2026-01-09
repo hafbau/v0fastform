@@ -1,4 +1,4 @@
-CREATE TABLE "submissions" (
+CREATE TABLE IF NOT EXISTS "submissions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"appId" uuid NOT NULL,
 	"data" jsonb NOT NULL,
@@ -7,4 +7,19 @@ CREATE TABLE "submissions" (
 	"updatedAt" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "submissions" ADD CONSTRAINT "submissions_appId_apps_id_fk" FOREIGN KEY ("appId") REFERENCES "public"."apps"("id") ON DELETE no action ON UPDATE no action;
+DO $$
+BEGIN
+	IF to_regclass('public.submissions') IS NOT NULL
+		AND NOT EXISTS (
+			SELECT 1
+			FROM pg_constraint
+			WHERE conname = 'submissions_appId_apps_id_fk'
+				AND conrelid = to_regclass('public.submissions')
+		)
+	THEN
+		ALTER TABLE "submissions"
+			ADD CONSTRAINT "submissions_appId_apps_id_fk"
+			FOREIGN KEY ("appId")
+			REFERENCES "public"."apps"("id") ON DELETE no action ON UPDATE no action;
+	END IF;
+END $$;

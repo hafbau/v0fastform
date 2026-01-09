@@ -22,6 +22,20 @@
       "when": 1767867995859,
       "tag": "0002_breezy_star_brand",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1767906050799,
+      "tag": "0003_add_jwt_secret_to_apps",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1767907136068,
+      "tag": "0004_schema_catch_up",
+      "breakpoints": true
     }
   ]
 }

@@ -24,12 +24,12 @@ import { isValidAppSpec } from '@/lib/types/appspec'
  */
 const logger = {
   log: (...args: unknown[]) => {
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV !== 'production') {
       console.log('[LLM]', ...args)
     }
   },
   warn: (...args: unknown[]) => {
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV !== 'production') {
       console.warn('[LLM]', ...args)
     }
   },
@@ -103,6 +103,7 @@ function getConfiguredProviders(): ProviderConfig[] {
   // Priority 1: Azure OpenAI
   const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT
   const azureKey = process.env.AZURE_OPENAI_KEY
+  const openaiModel = process.env.OPENAI_MODEL || 'gpt-5'
   if (azureEndpoint && azureKey) {
     const azure = createAzure({
       apiKey: azureKey,
@@ -111,7 +112,7 @@ function getConfiguredProviders(): ProviderConfig[] {
     providers.push({
       name: 'Azure OpenAI',
       model: azure,
-      modelId: 'gpt-4o', // Azure deployment name - adjust as needed
+      modelId: openaiModel, // Azure deployment name - adjust as needed
     })
   }
 
@@ -124,7 +125,7 @@ function getConfiguredProviders(): ProviderConfig[] {
     providers.push({
       name: 'OpenAI',
       model: openai,
-      modelId: 'gpt-4o',
+      modelId: openaiModel,
     })
   }
 
@@ -409,7 +410,7 @@ async function tryGenerateWithProvider(
       system: systemPrompt,
       prompt: userPrompt,
       temperature: 0.7,
-      maxTokens: 4000,
+      // maxTokens: 8000,
     })
 
     // Parse JSON response
