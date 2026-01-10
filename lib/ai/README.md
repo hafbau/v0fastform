@@ -33,12 +33,16 @@ Configure at least one LLM provider:
 ```bash
 AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com"
 AZURE_OPENAI_KEY="your-azure-key"
+AZURE_OPENAI_API_VERSION="2025-01-01-preview" # recommended starting point
+AZURE_OPENAI_USE_DEPLOYMENT_URLS="true" # recommended for most Azure resources
+OPENAI_MODEL="gpt-5" # your Azure deployment name
 ```
 
 ### OpenAI (Fallback)
 
 ```bash
 OPENAI_API_KEY="sk-..."
+OPENAI_MODEL="gpt-5"
 ```
 
 ### Anthropic (Final Fallback)

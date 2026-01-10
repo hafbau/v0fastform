@@ -17,15 +17,19 @@ vi.mock('@/app/(auth)/auth', () => ({
 
 // Mock database queries
 const mockGetAppById = vi.fn()
+const mockGetAppByChatId = vi.fn()
 const mockGetChatCountByUserId = vi.fn()
 const mockCreateChatOwnership = vi.fn()
+const mockUpdateAppSpec = vi.fn()
 
 vi.mock('@/lib/db/queries', () => ({
   getAppById: (args: { appId: string }) => mockGetAppById(args),
+  getAppByChatId: (args: { chatId: string }) => mockGetAppByChatId(args),
   getChatCountByUserId: (args: any) => mockGetChatCountByUserId(args),
   getChatCountByIP: vi.fn().mockResolvedValue(0),
   createChatOwnership: (args: any) => mockCreateChatOwnership(args),
   createAnonymousChatLog: vi.fn(),
+  updateAppSpec: (args: any) => mockUpdateAppSpec(args),
 }))
 
 // Mock entitlements
@@ -75,12 +79,52 @@ vi.mock('@/lib/ai/appspec-generator', () => ({
   },
 }))
 
+// Mock AppSpec compiler
+const mockCompileAppSpecToPrompt = vi.fn()
+vi.mock('@/lib/compiler/appspec-to-prompt', () => ({
+  compileAppSpecToPrompt: (spec: any) => mockCompileAppSpecToPrompt(spec),
+}))
+
+// Mock AppSpec type validator
+const mockIsValidAppSpec = vi.fn()
+vi.mock('@/lib/types/appspec', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...(actual as object),
+    isValidAppSpec: (spec: any) => mockIsValidAppSpec(spec),
+  }
+})
+
+// Mock progress stream
+vi.mock('@/lib/streaming/progress-stream', () => ({
+  createProgressStreamController: vi.fn(() => ({
+    readable: new ReadableStream(),
+    sendProgress: vi.fn(),
+    sendError: vi.fn(),
+    pipeStream: vi.fn(),
+    close: vi.fn(),
+  })),
+  PROGRESS_MESSAGES: {
+    UNDERSTANDING: 'Understanding your request...',
+    UPDATING: 'Updating your app requirements...',
+    PREPARING: 'Preparing to build...',
+    BUILDING: 'Building your app...',
+  },
+  SSE_HEADERS: {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  },
+}))
+
 // Mock v0-sdk
+const mockV0ChatsCreate = vi.fn()
+const mockV0ChatsSendMessage = vi.fn()
 vi.mock('v0-sdk', () => ({
   createClient: vi.fn(() => ({
     chats: {
-      create: vi.fn(),
-      sendMessage: vi.fn(),
+      create: mockV0ChatsCreate,
+      sendMessage: mockV0ChatsSendMessage,
     },
   })),
 }))
@@ -404,6 +448,197 @@ describe('POST /api/chat - AppSpec Generation', () => {
         }),
         sessionId: expect.any(String),
       })
+    })
+  })
+
+  describe('No Fallback Behavior', () => {
+    it('should NOT fall through to v0 SDK on AppSpec generation failure', async () => {
+      // Mock AppSpec generation to fail with unexpected error
+      mockCreateDraftAppSpec.mockRejectedValue(new Error('Unexpected LLM failure'))
+
+      const { POST } = await import('../route')
+
+      const request = new NextRequest('http://localhost:3000/api/chat', {
+        method: 'POST',
+        body: JSON.stringify({
+          message: 'build me an app',
+          appId: mockAppId,
+        }),
+      })
+
+      const response = await POST(request)
+      const data = await response.json()
+
+      // Should return error, NOT a stream
+      expect(response.status).toBe(500)
+      expect(data.error).toBe('appspec_generation_failed')
+      expect(data.message).toContain('encountered an issue')
+
+      // CRITICAL: v0 SDK should NOT have been called
+      expect(mockV0ChatsCreate).not.toHaveBeenCalled()
+      expect(mockV0ChatsSendMessage).not.toHaveBeenCalled()
+    })
+
+    it('should return user-friendly error message without internal system names', async () => {
+      mockCreateDraftAppSpec.mockRejectedValue(new Error('Internal error'))
+
+      const { POST } = await import('../route')
+
+      const request = new NextRequest('http://localhost:3000/api/chat', {
+        method: 'POST',
+        body: JSON.stringify({
+          message: 'create something',
+          appId: mockAppId,
+        }),
+      })
+
+      const response = await POST(request)
+      const data = await response.json()
+
+      // Error message should NOT mention internal terms like "v0", "AppSpec"
+      expect(data.message).not.toMatch(/v0/i)
+      expect(data.message).not.toMatch(/appspec/i)
+      expect(data.message).toContain('Please try rephrasing')
+    })
+  })
+
+  describe('AppSpec Regeneration for Follow-up Messages', () => {
+    const mockChatId = 'existing-chat-123'
+    const mockExistingSpec = { ...mockDraftSpec, id: 'existing-spec-id' }
+    const mockUpdatedSpec = {
+      ...mockDraftSpec,
+      id: 'updated-spec-id',
+      meta: { ...mockDraftSpec.meta, name: 'Updated Healthcare App' },
+    }
+
+    beforeEach(() => {
+      // Setup for follow-up message tests
+      mockGetAppByChatId.mockResolvedValue({
+        id: mockAppId,
+        userId: mockUserId,
+        spec: mockExistingSpec,
+      })
+      mockIsValidAppSpec.mockReturnValue(true)
+      mockRegenerateAppSpec.mockResolvedValue(mockUpdatedSpec)
+      mockCompileAppSpecToPrompt.mockReturnValue(
+        'Compiled prompt with full app context...',
+      )
+      mockUpdateAppSpec.mockResolvedValue([{ id: mockAppId }])
+    })
+
+    it('should regenerate AppSpec for follow-up messages with existing spec', async () => {
+      const { POST } = await import('../route')
+
+      const request = new NextRequest('http://localhost:3000/api/chat', {
+        method: 'POST',
+        body: JSON.stringify({
+          message: 'add a field for insurance provider',
+          chatId: mockChatId,
+          streaming: false,
+        }),
+      })
+
+      await POST(request)
+
+      // Verify regeneration was called with existing spec and new message
+      expect(mockRegenerateAppSpec).toHaveBeenCalledWith(
+        mockExistingSpec,
+        'add a field for insurance provider',
+      )
+    })
+
+    it('should persist updated AppSpec to database', async () => {
+      const { POST } = await import('../route')
+
+      const request = new NextRequest('http://localhost:3000/api/chat', {
+        method: 'POST',
+        body: JSON.stringify({
+          message: 'add emergency contact field',
+          chatId: mockChatId,
+          streaming: false,
+        }),
+      })
+
+      await POST(request)
+
+      // Verify spec was saved to database
+      expect(mockUpdateAppSpec).toHaveBeenCalledWith({
+        appId: mockAppId,
+        spec: expect.objectContaining({
+          id: 'updated-spec-id',
+        }),
+      })
+    })
+
+    it('should compile AppSpec before sending to v0', async () => {
+      const { POST } = await import('../route')
+
+      const request = new NextRequest('http://localhost:3000/api/chat', {
+        method: 'POST',
+        body: JSON.stringify({
+          message: 'add date of birth field',
+          chatId: mockChatId,
+          streaming: false,
+        }),
+      })
+
+      await POST(request)
+
+      // Verify compile function was called with updated spec
+      expect(mockCompileAppSpecToPrompt).toHaveBeenCalledWith(mockUpdatedSpec)
+    })
+
+    it('should send enriched message to v0 with context prefix', async () => {
+      const { POST } = await import('../route')
+
+      const request = new NextRequest('http://localhost:3000/api/chat', {
+        method: 'POST',
+        body: JSON.stringify({
+          message: 'make form mobile friendly',
+          chatId: mockChatId,
+          streaming: false,
+        }),
+      })
+
+      await POST(request)
+
+      // Verify v0 received enriched message (not raw user message)
+      expect(mockV0ChatsSendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chatId: mockChatId,
+          message: expect.stringContaining('[CONTEXT:'),
+        }),
+      )
+
+      // The message should include both compiled prompt and user's request
+      const callArgs = mockV0ChatsSendMessage.mock.calls[0][0]
+      expect(callArgs.message).toContain('Compiled prompt')
+      expect(callArgs.message).toContain("USER'S LATEST REQUEST")
+      expect(callArgs.message).toContain('make form mobile friendly')
+    })
+
+    it('should return error if AppSpec update fails (no v0 fallback)', async () => {
+      mockRegenerateAppSpec.mockRejectedValue(new Error('Regeneration failed'))
+
+      const { POST } = await import('../route')
+
+      const request = new NextRequest('http://localhost:3000/api/chat', {
+        method: 'POST',
+        body: JSON.stringify({
+          message: 'update the form',
+          chatId: mockChatId,
+          streaming: false,
+        }),
+      })
+
+      const response = await POST(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(500)
+      expect(data.error).toBe('appspec_update_failed')
+
+      // CRITICAL: v0 should NOT be called on failure
+      expect(mockV0ChatsSendMessage).not.toHaveBeenCalled()
     })
   })
 })

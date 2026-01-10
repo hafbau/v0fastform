@@ -130,6 +130,67 @@ export async function deleteApp({ appId }: { appId: string }) {
   }
 }
 
+/**
+ * Gets an app by its associated v0 chat ID.
+ * Looks up the chat ownership record first, then fetches the app.
+ */
+export async function getAppByChatId({
+  chatId,
+}: {
+  chatId: string
+}): Promise<App | null> {
+  try {
+    const db = getDb()
+    // First get the chat ownership to find the appId
+    const [ownership] = await db
+      .select()
+      .from(chatOwnerships)
+      .where(eq(chatOwnerships.v0ChatId, chatId))
+
+    if (!ownership) {
+      return null
+    }
+
+    // Then get the app
+    const [app] = await db
+      .select()
+      .from(apps)
+      .where(eq(apps.id, ownership.appId))
+
+    return app || null
+  } catch (error) {
+    console.error("Failed to get app by chat ID from database:", error)
+    return null
+  }
+}
+
+/**
+ * Updates an app's AppSpec.
+ * Used when regenerating AppSpec from follow-up messages.
+ */
+export async function updateAppSpec({
+  appId,
+  spec,
+}: {
+  appId: string
+  spec: Record<string, unknown>
+}): Promise<App[]> {
+  try {
+    const db = getDb()
+    return await db
+      .update(apps)
+      .set({
+        spec,
+        updatedAt: new Date(),
+      })
+      .where(eq(apps.id, appId))
+      .returning()
+  } catch (error) {
+    console.error("Failed to update app spec in database:", error)
+    throw error
+  }
+}
+
 // Chat ownership functions
 /**
  * Creates a chat ownership record linking a v0 chat to a user and app.

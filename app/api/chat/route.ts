@@ -7,7 +7,10 @@ import {
   getChatCountByUserId,
   getChatCountByIP,
   getAppById,
+  getAppByChatId,
+  updateAppSpec,
 } from '@/lib/db/queries'
+import { compileAppSpecToPrompt } from '@/lib/compiler/appspec-to-prompt'
 import {
   entitlementsByUserType,
   anonymousEntitlements,
@@ -19,7 +22,12 @@ import {
   AppSpecValidationError,
   AppSpecGenerationError,
 } from '@/lib/ai/appspec-generator'
-import type { FastformAppSpec } from '@/lib/types/appspec'
+import { isValidAppSpec, type FastformAppSpec } from '@/lib/types/appspec'
+import {
+  createProgressStreamController,
+  PROGRESS_MESSAGES,
+  SSE_HEADERS,
+} from '@/lib/streaming/progress-stream'
 import { randomUUID } from 'crypto'
 
 // Create v0 client with custom baseUrl if V0_API_URL is set
@@ -201,11 +209,21 @@ export async function POST(request: NextRequest) {
           )
         }
 
-        // For unexpected errors, fall through to existing v0 SDK flow
-        // This provides a graceful degradation path
-        console.warn(
-          'AppSpec generation failed unexpectedly, falling back to v0 SDK flow:',
-          error,
+        // For unexpected errors, return explicit error - NEVER fall through to raw v0 SDK
+        console.error('AppSpec generation failed unexpectedly:', error)
+        return NextResponse.json(
+          {
+            error: 'appspec_generation_failed',
+            message:
+              'We encountered an issue understanding your request. Please try rephrasing or simplifying your description.',
+            details:
+              process.env.NODE_ENV === 'development'
+                ? error instanceof Error
+                  ? error.message
+                  : String(error)
+                : undefined,
+          },
+          { status: 500 },
         )
       }
     }
@@ -258,31 +276,195 @@ export async function POST(request: NextRequest) {
     let chat
 
     if (chatId) {
-      // continue existing chat
-      if (streaming) {
-        // Return streaming response for existing chat
-        chat = await v0.chats.sendMessage({
-          chatId: chatId,
-          message,
-          responseMode: 'experimental_stream',
-          ...(attachments && attachments.length > 0 && { attachments }),
-        })
+      // ========================================================================
+      // APPSPEC REGENERATION FLOW FOR FOLLOW-UP MESSAGES
+      // ========================================================================
+      // For existing chats, we:
+      // 1. Fetch the existing AppSpec from the database
+      // 2. Regenerate it with the new user message
+      // 3. Persist the updated AppSpec
+      // 4. Compile it to a detailed prompt
+      // 5. Send the compiled prompt to v0 (not the raw message)
 
-        // Return the stream directly
-        return new Response(chat as ReadableStream<Uint8Array>, {
-          headers: {
-            'Content-Type': 'text/event-stream',
-            'Cache-Control': 'no-cache',
-            Connection: 'keep-alive',
-          },
-        })
+      const app = await getAppByChatId({ chatId })
+      const existingSpec = app?.spec as FastformAppSpec | null
+
+      // DEBUG: Log AppSpec flow decision
+      console.log('[AppSpec Flow Debug]', {
+        chatId,
+        hasApp: !!app,
+        appId: app?.id,
+        hasSpec: !!existingSpec,
+        specVersion: existingSpec?.version,
+        specId: existingSpec?.id,
+        isValidAppSpec: existingSpec ? isValidAppSpec(existingSpec) : 'N/A',
+        rawSpec: app?.spec ? JSON.stringify(app.spec).substring(0, 200) : null,
+      })
+
+      // If app has a valid AppSpec, use the regeneration flow with progress streaming
+      if (app && existingSpec && isValidAppSpec(existingSpec)) {
+        console.log('[AppSpec Flow] Using AppSpec regeneration flow')
+
+        // Check if this is a trigger build message (first build after confirmation)
+        const isTriggerBuild = message === '__TRIGGER_BUILD__'
+
+        if (streaming) {
+          // Use progress streaming for better UX
+          const progressController = createProgressStreamController()
+
+          // Start processing in background
+          ;(async () => {
+            try {
+              let specToUse = existingSpec
+
+              if (isTriggerBuild) {
+                // For trigger build, use existing AppSpec directly (no regeneration needed)
+                console.log('[AppSpec Flow] Trigger build - using existing AppSpec')
+                await progressController.sendProgress(PROGRESS_MESSAGES.PREPARING)
+              } else {
+                // For regular follow-ups, regenerate AppSpec with user message
+                await progressController.sendProgress(PROGRESS_MESSAGES.UNDERSTANDING)
+
+                // 1. Regenerate AppSpec with new user message
+                specToUse = await regenerateAppSpec(existingSpec, message)
+
+                // Progress: Updating
+                await progressController.sendProgress(PROGRESS_MESSAGES.UPDATING)
+
+                // 2. Persist updated AppSpec to database
+                await updateAppSpec({
+                  appId: app.id,
+                  spec: specToUse as unknown as Record<string, unknown>,
+                })
+
+                // Progress: Preparing
+                await progressController.sendProgress(PROGRESS_MESSAGES.PREPARING)
+              }
+
+              // 3. Compile AppSpec to detailed prompt
+              const compiledPrompt = compileAppSpecToPrompt(specToUse)
+
+              // 4. Build enriched message with full context
+              const userRequest = isTriggerBuild
+                ? 'Build the application according to the specifications above. Do not ask any clarifying questions - all requirements are defined in the specification.'
+                : message
+              const enrichedMessage = `[CONTEXT: ${isTriggerBuild ? 'Building app from confirmed specification' : 'User is refining their app requirements'}]\n\n${compiledPrompt}\n\n[USER'S LATEST REQUEST]: ${userRequest}`
+
+              // DEBUG: Log what we're sending to v0
+              console.log('[AppSpec Flow] Sending enriched message to v0:', {
+                messageLength: enrichedMessage.length,
+                hasContext: enrichedMessage.includes('[CONTEXT:'),
+                hasUserRequest: enrichedMessage.includes("[USER'S LATEST REQUEST]:"),
+                preview: enrichedMessage.substring(0, 500),
+              })
+
+              // Progress: Building
+              await progressController.sendProgress(PROGRESS_MESSAGES.BUILDING)
+
+              // 5. Send enriched message to v0 and pipe the stream
+              const v0Stream = await v0.chats.sendMessage({
+                chatId: chatId,
+                message: enrichedMessage,
+                responseMode: 'experimental_stream',
+                ...(attachments && attachments.length > 0 && { attachments }),
+              })
+
+              // Pipe v0 stream to our response
+              await progressController.pipeStream(v0Stream as ReadableStream<Uint8Array>)
+            } catch (error) {
+              console.error('AppSpec regeneration failed for follow-up:', error)
+              await progressController.sendError(
+                'We had trouble updating your app requirements. Please try again.',
+              )
+            } finally {
+              await progressController.close()
+            }
+          })()
+
+          // Return the stream immediately
+          return new Response(progressController.readable, {
+            headers: SSE_HEADERS,
+          })
+        } else {
+          // Non-streaming flow (no progress needed)
+          try {
+            let specToUse = existingSpec
+
+            if (!isTriggerBuild) {
+              // For regular follow-ups, regenerate AppSpec
+              specToUse = await regenerateAppSpec(existingSpec, message)
+              await updateAppSpec({
+                appId: app.id,
+                spec: specToUse as unknown as Record<string, unknown>,
+              })
+            }
+
+            const compiledPrompt = compileAppSpecToPrompt(specToUse)
+            const userRequest = isTriggerBuild
+              ? 'Build the application according to the specifications above. Do not ask any clarifying questions - all requirements are defined in the specification.'
+              : message
+            const enrichedMessage = `[CONTEXT: ${isTriggerBuild ? 'Building app from confirmed specification' : 'User is refining their app requirements'}]\n\n${compiledPrompt}\n\n[USER'S LATEST REQUEST]: ${userRequest}`
+
+            chat = await v0.chats.sendMessage({
+              chatId: chatId,
+              message: enrichedMessage,
+              ...(attachments && attachments.length > 0 && { attachments }),
+            })
+          } catch (error) {
+            console.error('AppSpec regeneration failed for follow-up:', error)
+            return NextResponse.json(
+              {
+                error: 'appspec_update_failed',
+                message:
+                  'We had trouble updating your app requirements. Please try again.',
+                details:
+                  process.env.NODE_ENV === 'development'
+                    ? error instanceof Error
+                      ? error.message
+                      : String(error)
+                    : undefined,
+              },
+              { status: 500 },
+            )
+          }
+        }
       } else {
-        // Non-streaming response for existing chat
-        chat = await v0.chats.sendMessage({
-          chatId: chatId,
-          message,
-          ...(attachments && attachments.length > 0 && { attachments }),
-        })
+        // ========================================================================
+        // LEGACY CHAT PATH: No valid AppSpec found
+        // ========================================================================
+        // This path handles chats that:
+        // 1. Were created before AppSpec implementation
+        // 2. Have an app with empty or invalid spec
+        //
+        // In this case, we send the raw user message to v0 without AppSpec context.
+        // This is intentional to maintain backwards compatibility with existing chats.
+        //
+        // NOTE: New chats always go through AppSpec generation first (see above),
+        // so this path only applies to pre-existing chats without specs.
+        // ========================================================================
+        console.log('[AppSpec Flow] LEGACY PATH - No valid AppSpec, sending raw message to v0')
+        if (streaming) {
+          chat = await v0.chats.sendMessage({
+            chatId: chatId,
+            message,
+            responseMode: 'experimental_stream',
+            ...(attachments && attachments.length > 0 && { attachments }),
+          })
+
+          return new Response(chat as ReadableStream<Uint8Array>, {
+            headers: {
+              'Content-Type': 'text/event-stream',
+              'Cache-Control': 'no-cache',
+              Connection: 'keep-alive',
+            },
+          })
+        } else {
+          chat = await v0.chats.sendMessage({
+            chatId: chatId,
+            message,
+            ...(attachments && attachments.length > 0 && { attachments }),
+          })
+        }
       }
     } else {
       // create new chat

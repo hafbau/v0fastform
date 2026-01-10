@@ -35,6 +35,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Plus } from 'lucide-react'
+import IntentConfirmation from '@/components/chat/intent-confirmation'
+import type { FastformAppSpec } from '@/lib/types/appspec'
+import { useToast } from '@/hooks/use-toast'
+import { createProgressFilteredStream } from '@/lib/streaming/parse-progress-stream'
 
 // App type definition
 interface App {
@@ -91,6 +95,17 @@ export function HomeClient() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [activePanel, setActivePanel] = useState<'chat' | 'preview'>('chat')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Intent confirmation state
+  const [draftSpec, setDraftSpec] = useState<FastformAppSpec | null>(null)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [showIntentConfirmation, setShowIntentConfirmation] = useState(false)
+  const [isBuilding, setIsBuilding] = useState(false)
+
+  // Progress message state for streaming updates
+  const [progressMessage, setProgressMessage] = useState<string | null>(null)
+
+  const { toast } = useToast()
 
   // Fetch user's apps
   const { data: appsData, isLoading: appsLoading } =
@@ -244,6 +259,33 @@ export function HomeClient() {
         throw new Error(errorMessage)
       }
 
+      // Check Content-Type to distinguish JSON from stream
+      const contentType = response.headers.get('Content-Type') || ''
+
+      if (contentType.includes('application/json')) {
+        // Handle JSON response (intent-confirmation)
+        const data = await response.json()
+
+        if (data.type === 'intent-confirmation') {
+          // Intent confirmation response - show IntentConfirmation component
+          setDraftSpec(data.draftSpec)
+          setSessionId(data.sessionId)
+          setShowIntentConfirmation(true)
+          setIsLoading(false)
+          return // Don't treat as stream
+        } else {
+          // Unexpected JSON response type
+          toast({
+            title: 'Unexpected response',
+            description: 'Received an unexpected response type from the server.',
+            variant: 'destructive',
+          })
+          setIsLoading(false)
+          return
+        }
+      }
+
+      // Streaming response - continue with existing flow
       if (!response.body) {
         throw new Error('No response body for streaming')
       }
@@ -374,6 +416,96 @@ export function HomeClient() {
     })
   }
 
+  // Handle intent confirmation - user confirms the spec and triggers v0 generation
+  const handleIntentConfirm = async (editedSpec: FastformAppSpec) => {
+    if (!selectedAppId || !sessionId) return
+
+    setIsBuilding(true)
+
+    try {
+      // 1. Persist the AppSpec to the database
+      const response = await fetch(`/api/apps/${selectedAppId}/appspec`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          spec: editedSpec,
+          sessionId,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to persist AppSpec')
+      }
+
+      const data = await response.json()
+      const chatId = data.chatId
+
+      // 2. Update state
+      setShowIntentConfirmation(false)
+      setCurrentChatId(chatId)
+      setCurrentChat({ id: chatId })
+
+      // Update URL without triggering Next.js routing
+      window.history.pushState(null, '', `/chats/${chatId}`)
+
+      // 3. Trigger v0 generation by sending the compiled prompt
+      const chatResponse = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chatId,
+          message: '__TRIGGER_BUILD__', // Special message to trigger build from confirmed spec
+          streaming: true,
+          appId: selectedAppId,
+        }),
+      })
+
+      if (!chatResponse.ok) {
+        throw new Error('Failed to start build')
+      }
+
+      if (!chatResponse.body) {
+        throw new Error('No response body for streaming')
+      }
+
+      // Add streaming assistant response
+      setChatHistory((prev) => [
+        ...prev,
+        {
+          type: 'assistant',
+          content: [],
+          isStreaming: true,
+          stream: chatResponse.body,
+        },
+      ])
+
+      setIsBuilding(false)
+    } catch (error) {
+      console.error('Error confirming intent:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to start building your app. Please try again.',
+        variant: 'destructive',
+      })
+      setIsBuilding(false)
+    }
+  }
+
+  // Handle intent refine - user wants to provide more details
+  const handleIntentRefine = () => {
+    setShowIntentConfirmation(false)
+    // Focus the chat input so user can provide more details
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus()
+      }
+    }, 0)
+  }
+
   const handleChatSendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!message.trim() || isLoading || !currentChatId) return
@@ -381,6 +513,7 @@ export function HomeClient() {
     const userMessage = message.trim()
     setMessage('')
     setIsLoading(true)
+    setProgressMessage(null) // Reset progress message for new request
 
     // Add user message to chat history
     setChatHistory((prev) => [...prev, { type: 'user', content: userMessage }])
@@ -424,16 +557,29 @@ export function HomeClient() {
         throw new Error('No response body for streaming')
       }
 
+      // Filter progress events from the stream and update progress state
+      const filteredStream = createProgressFilteredStream(
+        response.body,
+        (message) => setProgressMessage(message),
+        (errorMsg) => {
+          toast({
+            title: 'Error',
+            description: errorMsg,
+            variant: 'destructive',
+          })
+        }
+      )
+
       setIsLoading(false)
 
-      // Add streaming response
+      // Add streaming response with filtered stream
       setChatHistory((prev) => [
         ...prev,
         {
           type: 'assistant',
           content: [],
           isStreaming: true,
-          stream: response.body,
+          stream: filteredStream,
         },
       ])
     } catch (error) {
@@ -456,6 +602,28 @@ export function HomeClient() {
     }
   }
 
+  // Show Intent Confirmation UI
+  if (showIntentConfirmation && draftSpec) {
+    return (
+      <div>
+        {/* Handle search params with Suspense boundary */}
+        <Suspense fallback={null}>
+          <SearchParamsHandler onReset={handleReset} />
+        </Suspense>
+
+        <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8 py-8">
+          <div className="max-w-2xl w-full">
+            <IntentConfirmation
+              draftSpec={draftSpec}
+              onConfirm={handleIntentConfirm}
+              onRefine={handleIntentRefine}
+            />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (showChatInterface) {
     return (
       <div>
@@ -474,11 +642,15 @@ export function HomeClient() {
                 <div className="flex-1 overflow-y-auto">
                   <ChatMessages
                     chatHistory={chatHistory}
-                    isLoading={isLoading}
+                    isLoading={isLoading || isBuilding}
                     currentChat={currentChat}
                     onStreamingComplete={handleStreamingComplete}
                     onChatData={handleChatData}
-                    onStreamingStarted={() => setIsLoading(false)}
+                    onStreamingStarted={() => {
+                      setIsLoading(false)
+                      setProgressMessage(null) // Clear progress when content starts
+                    }}
+                    progressMessage={progressMessage}
                   />
                 </div>
 
@@ -486,7 +658,7 @@ export function HomeClient() {
                   message={message}
                   setMessage={setMessage}
                   onSubmit={handleChatSendMessage}
-                  isLoading={isLoading}
+                  isLoading={isLoading || isBuilding}
                   showSuggestions={false}
                 />
               </div>

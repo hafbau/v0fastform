@@ -30,6 +30,7 @@ interface ChatMessagesProps {
   onStreamingComplete: (finalContent: MessageBinaryFormat) => void
   onChatData: (chatData: unknown) => void
   onStreamingStarted?: () => void
+  progressMessage?: string | null
 }
 
 export function ChatMessages({
@@ -39,6 +40,7 @@ export function ChatMessages({
   onStreamingComplete,
   onChatData,
   onStreamingStarted,
+  progressMessage,
 }: ChatMessagesProps) {
   const streamingStartedRef = useRef(false)
 
@@ -108,8 +110,13 @@ export function ChatMessages({
             </Message>
           ))}
           {isLoading && (
-            <div className="flex justify-center py-4">
+            <div className="flex flex-col items-center justify-center py-4 gap-2">
               <Loader size={16} className="text-gray-500 dark:text-gray-400" />
+              {progressMessage && (
+                <p className="text-sm text-gray-500 dark:text-gray-400 animate-pulse">
+                  {progressMessage}
+                </p>
+              )}
             </div>
           )}
         </ConversationContent>

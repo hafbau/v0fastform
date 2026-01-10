@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient, ChatDetail } from 'v0-sdk'
 import { auth } from '@/app/(auth)/auth'
-import { getAppById } from '@/lib/db/queries'
+import { getAppById, createChatOwnership } from '@/lib/db/queries'
 import { getDb } from '@/lib/db/connection'
 import { apps } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { isValidAppSpec, type FastformAppSpec } from '@/lib/types/appspec'
+
+// Create v0 client
+const v0 = createClient(
+  process.env.V0_API_URL ? { baseUrl: process.env.V0_API_URL } : {},
+)
 
 /**
  * POST /api/apps/[appId]/appspec
@@ -24,6 +30,7 @@ import { isValidAppSpec, type FastformAppSpec } from '@/lib/types/appspec'
  * Success Response:
  * {
  *   success: true,
+ *   chatId: string,
  *   app: {
  *     id: string,
  *     name: string,
@@ -118,9 +125,29 @@ export async function POST(
     // Extract slug from the AppSpec meta
     const slug = draftSpec.meta.slug
 
-    // Return success response with app data
+    // Create a v0 chat with a minimal placeholder message
+    // The full AppSpec will be sent when the user triggers __TRIGGER_BUILD__
+    // This keeps the confirmation step fast while still creating the chat link
+    const chat = (await v0.chats.create({
+      message: `Building: ${draftSpec.meta.name}`,
+      responseMode: 'sync',
+    })) as ChatDetail
+
+    const chatId = chat.id
+
+    // Create chat ownership to link this chat to the app
+    await createChatOwnership({
+      v0ChatId: chatId,
+      userId: session.user.id,
+      appId: appId,
+    })
+
+    console.log('[AppSpec] Created chat and ownership:', { chatId, appId, userId: session.user.id })
+
+    // Return success response with chatId and app data
     return NextResponse.json({
       success: true,
+      chatId,
       app: {
         id: updatedApp.id,
         name: updatedApp.name,

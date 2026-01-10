@@ -1,0 +1,82 @@
+# Requirements: AppSpec Chat Architecture Fix
+
+*Generated from conversation on 2026-01-09*
+
+## Objective
+Fix the Fastform chat architecture to enforce AppSpec-first flow for all user interactions. Currently, messages can bypass AppSpec transformation and go directly to code generation, causing the system to ask unnecessary clarifying questions. The fix ensures every user message goes through AppSpec generation/regeneration before code generation.
+
+## Core Requirements
+
+### Must Have (High Priority)
+- [HIGH] **AppSpec flow is mandatory** - No raw user messages ever go directly to code generation
+- [HIGH] **Fix home-client.tsx** - Must handle `intent-confirmation` responses (currently broken - treats JSON as stream)
+- [HIGH] **Remove fallback behavior** - Delete lines 206-210 in route.ts that fall through to code generation on AppSpec failure
+- [HIGH] **Regenerate AppSpec on follow-ups** - Every follow-up message: `existingSpec + userMessage → updatedSpec → compile → send`
+- [HIGH] **Persist updated AppSpec** - Save regenerated AppSpec to database after each follow-up
+- [HIGH] **Full AppSpec context every message** - Send complete compiled AppSpec with every message (verbose but safe)
+- [HIGH] **Stream progress messages** - Show user-facing progress: "Understanding your request...", "Updating your app requirements...", "Preparing to build...", "Building your app..."
+- [HIGH] **No internal system mentions** - Never expose "v0", "AppSpec", or other internal terminology to users
+
+### Should Have (Medium Priority)
+- [MEDIUM] **Fallback UI for questionnaire content** - If code generation returns questionnaire-style content, extract text and present simply without interactive UI
+
+### Could Have (Low Priority / Inferred)
+- [LOW] **AppSpec diff tracking** - Track what changed between AppSpec versions for debugging
+
+## Technical Constraints
+- **Framework/Stack:** Next.js 15, React 19, TypeScript, v0 SDK
+- **Database:** PostgreSQL (AppSpec stored in `apps.spec` column)
+- **Streaming:** Use existing streaming infrastructure, augment with progress messages
+- **Integrations:** v0 SDK for code generation (internal only)
+- **Compiler:** Existing `compileAppSpecToPrompt()` function in `lib/compiler/appspec-to-prompt.ts`
+
+## User Context
+**Target Users:** Fastform customers building apps through conversational interface
+**Primary Use Case:** User describes what they want, system iteratively refines understanding, then generates code
+**User Flow:**
+1. User types initial request → AppSpec generated → Intent confirmation shown
+2. User confirms or refines → AppSpec persisted to DB
+3. User sends follow-up → AppSpec regenerated with new info → Compiled → Sent to code generation
+4. User sees progress indicators throughout → Code generated without unnecessary questions
+
+## Edge Cases & Considerations
+- **What if AppSpec generation fails?** - Show user-friendly error, do NOT fall through to raw code generation
+- **What if code generation still asks questions?** - Extract question text, present in simple format (not interactive questionnaire)
+- **What if user sends rapid follow-ups?** - Each should regenerate AppSpec (no race conditions)
+- **What if compiled prompt is very long?** - Accept verbosity for correctness (option 1 chosen)
+
+## Implicit Requirements
+*Inferred from conversation context - please verify:*
+- [Architecture] Chat histories should be conceptually separate: User↔Fastform vs Fastform↔CodeGen
+- [UX] Progress messages should feel natural, not robotic
+- [Performance] Progress streaming should not add significant latency
+- [Reliability] AppSpec persistence must succeed before proceeding to code generation
+
+> **Note:** These requirements were surfaced by analyzing conversation patterns.
+
+## Success Criteria
+How we know this is complete and working:
+- ✓ No user message ever bypasses AppSpec transformation
+- ✓ `home-client.tsx` properly handles `intent-confirmation` responses
+- ✓ Follow-up messages correctly regenerate and persist AppSpec
+- ✓ Users see progress indicators during multi-step flow
+- ✓ No internal system names visible to users
+- ✓ Code generation receives detailed context and doesn't ask unnecessary questions
+- ✓ Fallback exists for unexpected questionnaire content
+
+## Files to Modify
+| File | Change |
+|------|--------|
+| `components/home/home-client.tsx` | Handle `intent-confirmation` response type |
+| `app/api/chat/route.ts` | Remove fallback (206-210), add AppSpec regeneration flow, add progress streaming |
+| `lib/ai/appspec-generator.ts` | Ensure `regenerateAppSpec` is properly exported/used |
+| `components/message-renderer.tsx` | Add fallback for questionnaire content |
+| `hooks/use-chat.ts` | May need updates for progress message handling |
+
+## Next Steps
+1. Review this PRD for accuracy and completeness
+2. If anything is missing or unclear, continue the conversation
+3. When ready, use `/clavix:plan` to generate implementation tasks
+
+---
+*This PRD was generated by Clavix from conversational requirements gathering.*

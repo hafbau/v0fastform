@@ -20,7 +20,10 @@ vi.mock('ai', () => ({
 }))
 
 vi.mock('@ai-sdk/azure', () => ({
-  createAzure: vi.fn(() => vi.fn()),
+  createAzure: vi.fn(() => ({
+    chat: vi.fn(() => ({} as any)),
+    responses: vi.fn(() => ({} as any)),
+  })),
 }))
 
 vi.mock('@ai-sdk/openai', () => ({
@@ -197,7 +200,7 @@ describe('llm-client', () => {
           prompt: expect.stringContaining('Create a patient intake form'),
           system: expect.stringContaining('FastformAppSpec v0.3'),
           temperature: 0.7,
-          maxTokens: 4000,
+          maxOutputTokens: 4000,
         })
       )
     })
@@ -382,13 +385,12 @@ describe('llm-client', () => {
       expect(generateText).toHaveBeenCalledTimes(1)
     })
 
-    it('should fallback to OpenAI if Azure fails', async () => {
+    it('should fallback to Azure chat if Azure responses fails', async () => {
       process.env.AZURE_OPENAI_ENDPOINT = 'https://test-resource.openai.azure.com'
       process.env.AZURE_OPENAI_KEY = 'azure-key'
-      process.env.OPENAI_API_KEY = 'openai-key'
 
       vi.mocked(generateText)
-        .mockRejectedValueOnce(new Error('Azure failed'))
+        .mockRejectedValueOnce(new Error('Azure responses failed'))
         .mockResolvedValueOnce({
           text: JSON.stringify(mockValidAppSpec),
           finishReason: 'stop',
@@ -397,8 +399,28 @@ describe('llm-client', () => {
 
       await generateAppSpec('Create a patient intake form', [])
 
-      // Should try Azure, then OpenAI
+      // Should try Azure (responses), then Azure (chat)
       expect(generateText).toHaveBeenCalledTimes(2)
+    })
+
+    it('should fallback to OpenAI if Azure fails', async () => {
+      process.env.AZURE_OPENAI_ENDPOINT = 'https://test-resource.openai.azure.com'
+      process.env.AZURE_OPENAI_KEY = 'azure-key'
+      process.env.OPENAI_API_KEY = 'openai-key'
+
+      vi.mocked(generateText)
+        .mockRejectedValueOnce(new Error('Azure responses failed'))
+        .mockRejectedValueOnce(new Error('Azure chat failed'))
+        .mockResolvedValueOnce({
+          text: JSON.stringify(mockValidAppSpec),
+          finishReason: 'stop',
+          usage: { promptTokens: 100, completionTokens: 200, totalTokens: 300 },
+        } as any)
+
+      await generateAppSpec('Create a patient intake form', [])
+
+      // Should try Azure (responses), Azure (chat), then OpenAI
+      expect(generateText).toHaveBeenCalledTimes(3)
     })
 
     it('should fallback to Anthropic if OpenAI fails', async () => {

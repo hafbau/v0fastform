@@ -7,9 +7,11 @@ import Link from 'next/link'
 import { Trash2 } from 'lucide-react'
 import useSWR, { mutate } from 'swr'
 import { ChatInput } from '@/components/chat/chat-input'
+import IntentConfirmation from '@/components/chat/intent-confirmation'
 import { AuthRequiredModal } from '@/components/shared/auth-required-modal'
 import { type ImageAttachment } from '@/components/ai-elements/prompt-input'
 import { generateAppName } from '@/lib/utils/generate-app-name'
+import type { FastformAppSpec } from '@/lib/types/appspec'
 
 interface App {
   id: string
@@ -39,6 +41,15 @@ export function AppsListClient() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Intent confirmation (draft AppSpec) state
+  const [draftSpec, setDraftSpec] = useState<FastformAppSpec | null>(null)
+  const [draftSessionId, setDraftSessionId] = useState<string | null>(null)
+  const [draftAppId, setDraftAppId] = useState<string | null>(null)
+  const [lastUserIntent, setLastUserIntent] = useState<string | null>(null)
+  const [lastIntentAttachments, setLastIntentAttachments] = useState<
+    Array<{ url: string }> | undefined
+  >(undefined)
 
   const handleDeleteApp = async (appId: string, appName: string) => {
     if (!confirm(`Delete "${appName}"? This will also delete all chats in this app.`)) {
@@ -75,20 +86,35 @@ export function AppsListClient() {
     const userMessage = message.trim()
 
     try {
-      // 1. Create app with name from message
-      const appName = generateAppName(userMessage)
-      const appResponse = await fetch('/api/apps', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: appName }),
-      })
+      // If we're currently in the intent-confirmation flow, reuse the same app and session
+      // to refine the draft spec instead of creating a new app.
+      let appId = draftAppId
+      let sessionId = draftSessionId
 
-      if (!appResponse.ok) {
-        throw new Error('Failed to create app')
+      if (!appId) {
+        // 1. Create app with name from message
+        const appName = generateAppName(userMessage)
+        const appResponse = await fetch('/api/apps', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: appName }),
+        })
+
+        if (!appResponse.ok) {
+          throw new Error('Failed to create app')
+        }
+
+        const appData = await appResponse.json()
+        appId = appData.data.id
+        setDraftAppId(appId)
+
+        // Refresh app list so the newly created app shows up immediately
+        mutate('/api/apps')
       }
 
-      const appData = await appResponse.json()
-      const appId = appData.data.id
+      if (!appId) {
+        throw new Error('Could not determine app ID')
+      }
 
       // 2. Create chat with the message (non-streaming to get chatId directly)
       const chatResponse = await fetch('/api/chat', {
@@ -97,6 +123,7 @@ export function AppsListClient() {
         body: JSON.stringify({
           message: userMessage,
           appId,
+          sessionId,
           streaming: false,
           attachments: submittedAttachments,
         }),
@@ -107,6 +134,19 @@ export function AppsListClient() {
       }
 
       const chatData = await chatResponse.json()
+
+      // NEW: Intent confirmation flow (no chat id yet)
+      if (chatData.type === 'intent-confirmation') {
+        setDraftSpec(chatData.draftSpec)
+        setDraftSessionId(chatData.sessionId)
+        setLastUserIntent(userMessage)
+        setLastIntentAttachments(submittedAttachments)
+        setMessage('')
+        setAttachments([])
+        setIsSubmitting(false)
+        return
+      }
+
       const chatId = chatData.id
 
       if (!chatId) {
@@ -116,11 +156,81 @@ export function AppsListClient() {
       // 3. Clear message and redirect
       setMessage('')
       setAttachments([])
+      setDraftSpec(null)
+      setDraftSessionId(null)
+      setDraftAppId(null)
+      setLastUserIntent(null)
+      setLastIntentAttachments(undefined)
       router.push(`/apps/${appId}/chats/${chatId}`)
     } catch (error) {
       console.error('Error creating app and chat:', error)
       setIsSubmitting(false)
     }
+  }
+
+  const handleConfirmDraftSpec = async (editedSpec: FastformAppSpec) => {
+    if (!draftAppId || !draftSessionId || !lastUserIntent) {
+      console.error('Missing draft state for confirmation')
+      return
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      // 1. Persist the AppSpec
+      const response = await fetch(`/api/apps/${draftAppId}/appspec`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          spec: editedSpec,
+          sessionId: draftSessionId,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to persist AppSpec')
+      }
+
+      // 2. Create the actual v0 chat (AppSpec is now persisted, so /api/chat will use v0 flow)
+      const chatResponse = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: lastUserIntent,
+          appId: draftAppId,
+          streaming: false,
+          attachments: lastIntentAttachments,
+        }),
+      })
+
+      if (!chatResponse.ok) {
+        throw new Error('Failed to create chat after confirming AppSpec')
+      }
+
+      const chatData = await chatResponse.json()
+      const chatId = chatData.id
+      if (!chatId) {
+        throw new Error('Could not get chat ID from response')
+      }
+
+      // 3. Clear draft state and redirect
+      setDraftSpec(null)
+      setDraftSessionId(null)
+      setDraftAppId(null)
+      setLastUserIntent(null)
+      setLastIntentAttachments(undefined)
+      setIsSubmitting(false)
+      router.push(`/apps/${draftAppId}/chats/${chatId}`)
+    } catch (error) {
+      console.error('Error confirming AppSpec:', error)
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleRefineDraftSpec = () => {
+    setIsSubmitting(false)
+    textareaRef.current?.focus()
   }
 
   return (
@@ -149,6 +259,17 @@ export function AppsListClient() {
             />
           </div>
         </div>
+
+        {/* Intent confirmation (draft AppSpec) */}
+        {draftSpec && (
+          <div className="mb-12 max-w-4xl mx-auto">
+            <IntentConfirmation
+              draftSpec={draftSpec}
+              onConfirm={handleConfirmDraftSpec}
+              onRefine={handleRefineDraftSpec}
+            />
+          </div>
+        )}
 
         {/* Apps Section - Only show if authenticated and has apps */}
         {isAuthenticated && (

@@ -6,6 +6,8 @@
  *
  * Environment variables:
  * - AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_KEY: Azure OpenAI (preferred)
+ * - AZURE_OPENAI_API_VERSION: Azure OpenAI api-version query parameter
+ * - AZURE_OPENAI_USE_DEPLOYMENT_URLS: Use deployment-based Azure URLs (recommended)
  * - OPENAI_API_KEY: Direct OpenAI (fallback)
  * - ANTHROPIC_API_KEY: Anthropic Claude (final fallback)
  *
@@ -39,6 +41,40 @@ const logger = {
   },
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object') return null
+  return value as Record<string, unknown>
+}
+
+function getSafeErrorDetails(error: unknown): Record<string, unknown> {
+  const record = asRecord(error)
+  if (!record) {
+    return { value: String(error) }
+  }
+
+  const details: Record<string, unknown> = {
+    name: record.name,
+    message: record.message,
+  }
+
+  // Common AI SDK call error fields (avoid logging requestBodyValues / input)
+  if (typeof record.statusCode === 'number') details.statusCode = record.statusCode
+  if (typeof record.url === 'string') details.url = record.url
+  if (typeof record.responseBody === 'string') details.responseBody = record.responseBody
+  if (typeof record.isRetryable === 'boolean') details.isRetryable = record.isRetryable
+
+  const cause = (record as { cause?: unknown }).cause
+  if (cause) {
+    const causeRecord = asRecord(cause)
+    details.cause =
+      causeRecord && (causeRecord.message || causeRecord.name)
+        ? { name: causeRecord.name, message: causeRecord.message }
+        : String(cause)
+  }
+
+  return details
+}
+
 /**
  * Message in a conversation history.
  * Supports both user and assistant messages for context.
@@ -60,6 +96,29 @@ interface ProviderConfig {
   model: (modelId: string) => LanguageModel
   /** Model identifier string */
   modelId: string
+}
+
+function parseBooleanEnv(
+  value: string | undefined,
+  defaultValue: boolean
+): boolean {
+  if (value == null) return defaultValue
+  switch (value.trim().toLowerCase()) {
+    case '1':
+    case 'true':
+    case 'yes':
+    case 'y':
+    case 'on':
+      return true
+    case '0':
+    case 'false':
+    case 'no':
+    case 'n':
+    case 'off':
+      return false
+    default:
+      return defaultValue
+  }
 }
 
 /**
@@ -102,18 +161,62 @@ function getConfiguredProviders(): ProviderConfig[] {
 
   // Priority 1: Azure OpenAI
   const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT
-  const azureKey = process.env.AZURE_OPENAI_KEY
+  const azureKey = process.env.AZURE_OPENAI_KEY || process.env.AZURE_OPENAI_API_KEY
+  const azureKeySource = process.env.AZURE_OPENAI_KEY
+    ? 'AZURE_OPENAI_KEY'
+    : process.env.AZURE_OPENAI_API_KEY
+      ? 'AZURE_OPENAI_API_KEY'
+      : null
+  const azureApiVersion = process.env.AZURE_OPENAI_API_VERSION
+  const azureUseDeploymentBasedUrls = parseBooleanEnv(
+    process.env.AZURE_OPENAI_USE_DEPLOYMENT_URLS,
+    true
+  )
   const openaiModel = process.env.OPENAI_MODEL || 'gpt-5'
   if (azureEndpoint && azureKey) {
-    const azure = createAzure({
-      apiKey: azureKey,
-      resourceName: extractResourceName(azureEndpoint),
+    const resourceName = extractResourceName(azureEndpoint)
+    logger.log('Azure configured', {
+      resourceName,
+      deploymentOrModel: openaiModel,
+      apiVersion: azureApiVersion ?? '(default)',
+      useDeploymentBasedUrls: azureUseDeploymentBasedUrls,
+      keySource: azureKeySource,
     })
-    providers.push({
-      name: 'Azure OpenAI',
-      model: azure,
-      modelId: openaiModel, // Azure deployment name - adjust as needed
-    })
+    const apiVersionsToTry = Array.from(
+      new Set(
+        [
+          azureApiVersion,
+          // Commonly supported Azure OpenAI API version for deployment-based routes.
+          '2025-01-01-preview',
+        ].filter(Boolean)
+      )
+    )
+
+    for (const apiVersionToTry of apiVersionsToTry) {
+      const azure = createAzure({
+        apiKey: azureKey,
+        resourceName,
+        apiVersion: apiVersionToTry,
+        useDeploymentBasedUrls: azureUseDeploymentBasedUrls,
+      })
+
+      const baseName =
+        apiVersionsToTry.length > 1
+          ? `Azure OpenAI (api-version=${apiVersionToTry})`
+          : 'Azure OpenAI'
+
+      // Prefer Responses API first (newer models), then Chat Completions for compatibility.
+      providers.push({
+        name: `${baseName} (responses)`,
+        model: azure.responses,
+        modelId: openaiModel, // Azure deployment name - adjust as needed
+      })
+      providers.push({
+        name: `${baseName} (chat)`,
+        model: azure.chat,
+        modelId: openaiModel, // Azure deployment name - adjust as needed
+      })
+    }
   }
 
   // Priority 2: Direct OpenAI
@@ -122,6 +225,7 @@ function getConfiguredProviders(): ProviderConfig[] {
     const openai = createOpenAI({
       apiKey: openaiKey,
     })
+    logger.log('OpenAI configured', { model: openaiModel })
     providers.push({
       name: 'OpenAI',
       model: openai,
@@ -135,6 +239,7 @@ function getConfiguredProviders(): ProviderConfig[] {
     const anthropic = createAnthropic({
       apiKey: anthropicKey,
     })
+    logger.log('Anthropic configured', { model: 'claude-3-5-sonnet-20241022' })
     providers.push({
       name: 'Anthropic',
       model: anthropic,
@@ -405,12 +510,28 @@ async function tryGenerateWithProvider(
 ): Promise<FastformAppSpec> {
   try {
     // Generate text with structured output preference
-    const { text } = await generateText({
+    logger.log('generateText request', {
+      provider: provider.name,
+      modelId: provider.modelId,
+      systemLength: systemPrompt.length,
+      promptLength: userPrompt.length,
+      maxOutputTokens: 4000,
+      temperature: 0.7,
+    })
+
+    const { text, usage, finishReason } = await generateText({
       model: provider.model(provider.modelId),
       system: systemPrompt,
       prompt: userPrompt,
       temperature: 0.7,
-      // maxTokens: 8000,
+      maxOutputTokens: 4000,
+    })
+
+    logger.log('generateText response', {
+      provider: provider.name,
+      finishReason,
+      textLength: text.length,
+      usage,
     })
 
     // Parse JSON response
@@ -445,6 +566,10 @@ async function tryGenerateWithProvider(
     if (error instanceof AppSpecGenerationError) {
       throw error
     }
+    logger.error('Provider call failed', {
+      provider: provider.name,
+      ...getSafeErrorDetails(error),
+    })
     throw new AppSpecGenerationError(
       `Failed to generate AppSpec with ${provider.name}: ${error instanceof Error ? error.message : String(error)}`,
       provider.name,
@@ -500,6 +625,11 @@ export async function generateAppSpec(
 
   // Get configured providers
   const providers = getConfiguredProviders()
+  logger.log('Starting AppSpec generation', {
+    providers: providers.map((p) => ({ name: p.name, modelId: p.modelId })),
+    intentLength: userIntent.length,
+    conversationMessages: conversationHistory.length,
+  })
 
   // Build prompts
   const systemPrompt = buildSystemPrompt()
